@@ -1,6 +1,11 @@
+use wasm_bindgen::prelude::*;
+
 use std::collections::HashMap;
-use polars::prelude::{LazyFrame, LazyCsvReader, LazyFileListReader, col, JoinBuilder, JoinType, DataType, StrptimeOptions};
+use polars::{prelude::{LazyFrame, LazyCsvReader, col, JoinBuilder, JoinType, DataType, DataFrame, Series, NamedFrom, IntoLazy}, df};
+// use polars::prelude::{LazyFileListReader, StrptimeOptions};
+
 use serde::{Deserialize, Serialize};
+use serde_json::from_str;
 
 // pub fn add(left: usize, right: usize) -> usize {
 //     left + right
@@ -17,12 +22,32 @@ use serde::{Deserialize, Serialize};
 //     }
 // }
 
+#[wasm_bindgen]
+extern "C" {
+    /// From https://rustwasm.github.io/wasm-bindgen/examples/console-log.html
+    // Use `js_namespace` here to bind `console.log(..)` instead of just
+    // `log(..)`
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
 
+    // The `console.log` is quite polymorphic, so we can bind it with multiple
+    // signatures. Note that we need to use `js_name` to ensure we always call
+    // `log` in JS.
+    #[wasm_bindgen(js_namespace = console, js_name = log)]
+    fn log_u32(a: u32);
+
+    // Multiple arguments too!
+    #[wasm_bindgen(js_namespace = console, js_name = log)]
+    fn log_many(a: &str, b: &str);
+}
+
+#[wasm_bindgen]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SourceCsvPipeConfig {
     path: String,
 }
 
+#[wasm_bindgen]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct BinaryCalculationPipeConfig {
     pipe_id: String,
@@ -31,6 +56,7 @@ pub struct BinaryCalculationPipeConfig {
     column_2: String,
 }
 
+#[wasm_bindgen]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct JoinPipeConfig {
     left_pipe_id: String,
@@ -38,6 +64,7 @@ pub struct JoinPipeConfig {
     on: Vec<String>,
 }
 
+#[wasm_bindgen]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct StringToDatePipeConfig {
     pipe_id: String,
@@ -46,62 +73,109 @@ pub struct StringToDatePipeConfig {
     format: String,
 }
 
+#[wasm_bindgen]
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(tag="type")]
-pub enum PipeConfig {
-    SourceCsv(SourceCsvPipeConfig),
-    BinaryCalculation(BinaryCalculationPipeConfig),
-    Join(JoinPipeConfig),
-    StringToDate(StringToDatePipeConfig),
+// #[serde(tag="type")]
+// pub enum PipeConfig {
+//     SourceCsv(SourceCsvPipeConfig),
+//     BinaryCalculation(BinaryCalculationPipeConfig),
+//     Join(JoinPipeConfig),
+//     StringToDate(StringToDatePipeConfig),
+// }
+pub enum PipeConfigType {
+    SourceCsv,
+    BinaryCalculation,
+    Join,
+    // StringToDate,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub enum PipeConfig {
+    SourceCsv,
+    BinaryCalculation,
+    Join,
+    // StringToDate,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LazyFrameFactory {
-    pipe_configs: HashMap<String, PipeConfig>,
+    pipe_configs: HashMap<String, (PipeConfigType, String)>,
+    // pipe_configs: HashMap<String, PipeConfig>,
+}
+
+#[wasm_bindgen]
+pub fn do_thing() -> String {
+    let mut lff = LazyFrameFactory {
+        pipe_configs: HashMap::new()
+    };
+    lff.pipe_configs.insert("SourceOne".into(), (PipeConfigType::SourceCsv, "{\"path\": \"hello.csv\"}".into()));
+    lff.create_lazy_frame(String::from("SourceOne"))
 }
 
 impl LazyFrameFactory {
-    pub fn create_lazy_frame(self: &Self, pipe_id: String) -> Result<LazyFrame, String> {
-        match self.pipe_configs.get(&pipe_id) {
-            Some(config) => self.recurse(config.clone()),
-            None => return Err(format!("No pipe with id {} found in pipe_configs", pipe_id)),
-        }
-        
+    pub fn create_lazy_frame(self: &Self, pipe_id: String) -> String {
+    // pub fn create_lazy_frame(self: &Self, pipe_id: String) -> Result<LazyFrame, String> {
+        log("Start create_lazy_frame");
+        let _result_lf = match self.pipe_configs.get(&pipe_id) {
+            Some((config_type, config_str)) => self.recurse(&config_str, config_type),
+            None => Err(format!("No pipe with id {} found in pipe_configs", pipe_id)),
+        }.unwrap();
+        log("End create_lazy_frame");
+        return String::from("wow")
     }
 
-    fn recurse(self: &Self, config: PipeConfig) -> Result<LazyFrame, String> {
-        match config {
-            PipeConfig::SourceCsv(config) => {
-                match LazyCsvReader::new(config.path.clone()).finish() {
-                    Ok(lf) => Ok(lf),
-                    Err(e) => { println!("Error when scanning csv at path {}: {}", config.path, e); return Err(e.to_string()) },
-                }
+    fn recurse(self: &Self, config_str: &String, config_type: &PipeConfigType) -> Result<LazyFrame, String> {
+        log("Start recurse");
+        match config_type {
+            PipeConfigType::SourceCsv => {
+                log("Matched to SourceCSV");
+                log(&format!("Config is {:?}", config_str));
+                let config = match from_str::<SourceCsvPipeConfig>(&config_str) {
+                    Ok(x) => x,
+                    Err(e) => { log(&format!("ohno! Error when parsing config: {:?}", e)); return Err(e.to_string()) },
+                };
+                log(&format!("{:?}", config));
+                let df_ = DataFrame::new(vec![
+                    Series::new("hello", [1,2,3]),
+                    Series::new("b", [2,3,4]),
+                ]).unwrap(); 
+                log("Result<LazyFrame> obtained");
+                let lf = Ok(df_.lazy());
+                // let lf = match LazyCsvReader::new(config.path.clone()).finish() {
+                //     Ok(lf) => Ok(lf),
+                //     Err(e) => { println!("Error when scanning csv at path {}: {}", config.path, e); return Err(e.to_string()) },
+                // };
+                log("Result<LazyFrame> obtained");
+                lf
             },
-            PipeConfig::BinaryCalculation(config) => {
-                let source_config = match self.pipe_configs.get(&config.pipe_id) {
+            PipeConfigType::BinaryCalculation => {
+                let config = from_str::<BinaryCalculationPipeConfig>(&config_str).unwrap();
+                let (upstream_config_type, upstream_config) = match self.pipe_configs.get(&config.pipe_id) {
                     Some(c) => c.clone(),
                     None => { println!("Pipe id {} not found", config.pipe_id); return Err(format!("Pipe id {} not found", config.pipe_id)) },
                 };
-                let lf = match self.recurse(source_config) {
+                let lf = match self.recurse(&upstream_config, &upstream_config_type) {
                     Ok(lf) => lf,
                     Err(e) => return Err(e),
                 };
                 Ok(lf.with_column((col(&config.column_1) + col(&config.column_2)).alias(&config.new_column)))
             },
-            PipeConfig::Join(config) => {
-                let left_config = match self.pipe_configs.get(&config.left_pipe_id) {
+            PipeConfigType::Join => {
+                let config = from_str::<JoinPipeConfig>(&config_str).unwrap();
+                let (left_config_type, left_config) = match self.pipe_configs.get(&config.left_pipe_id) {
                     Some(c) => c,
                     None => { println!("Could not find pipe_id {} in pipe_configs", config.left_pipe_id); return Err(format!("Could not find pipe_id {} in pipe_configs", config.left_pipe_id)) },
                 };
-                let right_config = match self.pipe_configs.get(&config.right_pipe_id) {
+                let (right_config_type, right_config) = match self.pipe_configs.get(&config.right_pipe_id) {
                     Some(c) => c,
                     None => { println!("Could not find pipe_id {} in pipe_configs", config.right_pipe_id); return Err(format!("Could not find pipe_id {} in pipe_configs", config.right_pipe_id)) },
                 };
-                let left_lf = match self.recurse(left_config.clone()) {
+                let left_lf = match self.recurse(&left_config, &left_config_type) {
                     Ok(lf) => lf,
                     Err(e) => return Err(e),
                 };
-                let right_lf = match self.recurse(right_config.clone()) {
+                let right_lf = match self.recurse(&right_config, &right_config_type) {
                     Ok(lf) => lf,
                     Err(e) => return Err(e),
                 };
@@ -119,18 +193,19 @@ impl LazyFrameFactory {
                 };
                 Ok(jb_join.finish())
             },
-            PipeConfig::StringToDate(config) => {
-                let child_config = match self.pipe_configs.get(&config.pipe_id) {
-                    Some(v) => v,
-                    None => { println!("Unable to find pipe_id {}", config.pipe_id); return Err(format!("Unable to find pipe_id {}", config.pipe_id)) },
-                };
-                let lf = match self.recurse(child_config.clone()) {
-                    Ok(lf) => lf,
-                    Err(e) => return Err(e),
-                };
-                let options = StrptimeOptions { format: Some(String::from(config.format)), strict: true, exact: true, cache: false };
-                return Ok(lf.with_column(col(&config.column_from).str().strptime(DataType::Date, options).alias(&config.column_to)))
-            }
+            // PipeConfigType::StringToDate => {
+            //     let config = from_str::<StringToDatePipeConfig>(&config_str).unwrap();
+            //     let (child_config_type, child_config) = match self.pipe_configs.get(&config.pipe_id) {
+            //         Some(v) => v,
+            //         None => { println!("Unable to find pipe_id {}", config.pipe_id); return Err(format!("Unable to find pipe_id {}", config.pipe_id)) },
+            //     };
+            //     let lf = match self.recurse(&child_config, &child_config_type) {
+            //         Ok(lf) => lf,
+            //         Err(e) => return Err(e),
+            //     };
+            //     let options = StrptimeOptions { format: Some(String::from(config.format)), strict: true, exact: true, cache: false };
+            //     return Ok(lf.with_column(col(&config.column_from).str().strptime(DataType::Date, options).alias(&config.column_to)))
+            // }
         }
     }
 }
