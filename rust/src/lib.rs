@@ -6,6 +6,7 @@ use polars::{prelude::{LazyFrame, LazyCsvReader, col, JoinBuilder, JoinType, Dat
 
 use serde::{Deserialize, Serialize};
 use serde_json::from_str;
+use chrono::{NaiveDate, NaiveDateTime};
 
 // pub fn add(left: usize, right: usize) -> usize {
 //     left + right
@@ -34,7 +35,7 @@ extern "C" {
     // signatures. Note that we need to use `js_name` to ensure we always call
     // `log` in JS.
     #[wasm_bindgen(js_namespace = console, js_name = log)]
-    fn log_u32(a: u32);
+    fn log_u64(a: u64);
 
     // Multiple arguments too!
     #[wasm_bindgen(js_namespace = console, js_name = log)]
@@ -105,8 +106,11 @@ pub struct LazyFrameFactory {
 }
 
 #[derive(Serialize)]
-pub struct DataTable<T> {
-    data: HashMap<String, Vec<T>>
+pub struct DataTable {
+    f64: Option<HashMap<String, Vec<Option<f64>>>>,
+    i64: Option<HashMap<String, Vec<Option<i64>>>>,
+    str: Option<HashMap<String, Vec<Option<String>>>>,
+    datetime: Option<HashMap<String, Vec<Option<i64>>>>,
 }
 
 #[derive(Serialize)]
@@ -120,13 +124,13 @@ pub fn do_thing() -> Result<JsValue, JsValue> {
         pipe_configs: HashMap::new()
     };
     lff.pipe_configs.insert("SourceOne".into(), (PipeConfigType::SourceCsv, "{\"path\": \"hello.csv\"}".into()));
-    Ok(serde_wasm_bindgen::to_value(&lff.create_lazy_frame(String::from("SourceOne")))?)
+    Ok(serde_wasm_bindgen::to_value(&lff.create_lazy_frame(String::from("SourceOne")).unwrap())?)
 }
 
 // pub type DataTable<T> = HashMap<String, Vec<T>>;
 
 impl LazyFrameFactory {
-    pub fn create_lazy_frame(self: &Self, pipe_id: String) -> Result<DataTable<f64>, String> {
+    pub fn create_lazy_frame(self: &Self, pipe_id: String) -> Result<DataTable, String> {
     // pub fn create_lazy_frame(self: &Self, pipe_id: String) -> Result<LazyFrame, String> {
         log("Start create_lazy_frame");
         let _result_lf = match self.pipe_configs.get(&pipe_id) {
@@ -136,10 +140,22 @@ impl LazyFrameFactory {
         log("End create_lazy_frame");
         // return Ok(String::from("wow"))
 
-        let mut c: HashMap<String, Vec<f64>> = HashMap::new();
-        c.insert("column1".into(), vec![0.123, 0.234]);
-        c.insert("column2".into(), vec![9.876, 8.765]);
-        return Ok(DataTable { data: c })
+        let c = DataTable {
+            f64: Some(HashMap::from([
+                ("col1".into(), vec![Some(1.23), Some(2.34), Some(3.45), Some(4.56)]),
+                ("col5".into(), vec![Some(0.23), Some(0.34), Some(0.45), Some(0.56)]),
+            ])),
+            i64: Some(HashMap::from([("col2".into(), vec![Some(5),Some(6),Some(7),Some(8)])])),
+            str: Some(HashMap::from([("col3".into(), vec![Some("hello".into()), Some("fwo".into()), None, Some("fe2f".into())])])),
+            // datetime: Some(HashMap::from([("col4".into(), vec![Some(NaiveDate::from_ymd_opt(2023,1,1).unwrap().and_hms_opt(1,2,3).unwrap()), None, None, None])])),
+            datetime: Some(HashMap::from([("col4".into(), vec![Some(5),Some(6),Some(7),Some(8)])])),
+        };
+        return Ok(c)
+
+        // let mut c: HashMap<String, Vec<f64 | String>> = HashMap::new();
+        // c.insert("column1".into(), vec![Some(0.123), Some(0.234), None]);
+        // c.insert("column2".into(), vec![Some(9.876), None, Some(2.1)]);
+        // return Ok(DataTable { data: c })
 
         // let c = vec![
         //     HashMap::<String, f64>::from([ ("a".into(), 1.), ("b".into(), 2.) ]),
