@@ -11,6 +11,6 @@ export class MainComponent {
     }
     onClick() {
         const p = polarsPipes
-        console.log(p)
+        console.log(p.do_thing())
     }
 }

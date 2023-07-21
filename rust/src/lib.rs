@@ -104,19 +104,29 @@ pub struct LazyFrameFactory {
     // pipe_configs: HashMap<String, PipeConfig>,
 }
 
+#[derive(Serialize)]
+pub struct DataTable<T> {
+    data: HashMap<String, Vec<T>>
+}
+
+#[derive(Serialize)]
+pub struct DataTable2<T> {
+    data: Vec<HashMap<String, T>>
+}
+
 #[wasm_bindgen]
-pub fn do_thing() -> Result<Vec<f64>, String> {
+pub fn do_thing() -> Result<JsValue, JsValue> {
     let mut lff = LazyFrameFactory {
         pipe_configs: HashMap::new()
     };
     lff.pipe_configs.insert("SourceOne".into(), (PipeConfigType::SourceCsv, "{\"path\": \"hello.csv\"}".into()));
-    lff.create_lazy_frame(String::from("SourceOne"))
+    Ok(serde_wasm_bindgen::to_value(&lff.create_lazy_frame(String::from("SourceOne")))?)
 }
 
 // pub type DataTable<T> = HashMap<String, Vec<T>>;
 
 impl LazyFrameFactory {
-    pub fn create_lazy_frame(self: &Self, pipe_id: String) -> Result<Vec<f64>, String> {
+    pub fn create_lazy_frame(self: &Self, pipe_id: String) -> Result<DataTable<f64>, String> {
     // pub fn create_lazy_frame(self: &Self, pipe_id: String) -> Result<LazyFrame, String> {
         log("Start create_lazy_frame");
         let _result_lf = match self.pipe_configs.get(&pipe_id) {
@@ -125,11 +135,20 @@ impl LazyFrameFactory {
         }.unwrap();
         log("End create_lazy_frame");
         // return Ok(String::from("wow"))
-        // let mut c: HashMap<String, f64> = HashMap::new();
-        // c.insert("column1".into(), 0.123);
-        // c.insert("column2".into(), 9.876);
-        // return Ok(c);
-        return Ok(vec![0.,1.,2.,3.])
+
+        let mut c: HashMap<String, Vec<f64>> = HashMap::new();
+        c.insert("column1".into(), vec![0.123, 0.234]);
+        c.insert("column2".into(), vec![9.876, 8.765]);
+        return Ok(DataTable { data: c })
+
+        // let c = vec![
+        //     HashMap::<String, f64>::from([ ("a".into(), 1.), ("b".into(), 2.) ]),
+        //     HashMap::<String, f64>::from([ ("a".into(), 4.), ("b".into(), 8.) ]),
+        //     HashMap::<String, f64>::from([ ("a".into(), 3.), ("b".into(), 9.) ]),
+        // ];
+        // return Ok(DataTable2 { data: c })
+
+        // return Ok(vec![0.,1.,2.,3.])
     }
 
     fn recurse(self: &Self, config_str: &String, config_type: &PipeConfigType) -> Result<LazyFrame, String> {
