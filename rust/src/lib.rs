@@ -1,7 +1,7 @@
 use wasm_bindgen::prelude::*;
 
 use std::collections::HashMap;
-use polars::{prelude::{LazyFrame, LazyCsvReader, col, JoinBuilder, JoinType, DataType, DataFrame, Series, NamedFrom, IntoLazy}, df};
+use polars::{prelude::{LazyFrame, LazyCsvReader, col, JoinBuilder, JoinType, DataType, DataFrame, Series, NamedFrom, IntoLazy, PolarsDataType}, df};
 // use polars::prelude::{LazyFileListReader, StrptimeOptions};
 
 use serde::{Deserialize, Serialize};
@@ -105,7 +105,7 @@ pub struct LazyFrameFactory {
 }
 
 #[wasm_bindgen]
-pub fn do_thing() -> String {
+pub fn do_thing() -> Result<Vec<f64>, String> {
     let mut lff = LazyFrameFactory {
         pipe_configs: HashMap::new()
     };
@@ -113,8 +113,10 @@ pub fn do_thing() -> String {
     lff.create_lazy_frame(String::from("SourceOne"))
 }
 
+// pub type DataTable<T> = HashMap<String, Vec<T>>;
+
 impl LazyFrameFactory {
-    pub fn create_lazy_frame(self: &Self, pipe_id: String) -> String {
+    pub fn create_lazy_frame(self: &Self, pipe_id: String) -> Result<Vec<f64>, String> {
     // pub fn create_lazy_frame(self: &Self, pipe_id: String) -> Result<LazyFrame, String> {
         log("Start create_lazy_frame");
         let _result_lf = match self.pipe_configs.get(&pipe_id) {
@@ -122,7 +124,12 @@ impl LazyFrameFactory {
             None => Err(format!("No pipe with id {} found in pipe_configs", pipe_id)),
         }.unwrap();
         log("End create_lazy_frame");
-        return String::from("wow")
+        // return Ok(String::from("wow"))
+        // let mut c: HashMap<String, f64> = HashMap::new();
+        // c.insert("column1".into(), 0.123);
+        // c.insert("column2".into(), 9.876);
+        // return Ok(c);
+        return Ok(vec![0.,1.,2.,3.])
     }
 
     fn recurse(self: &Self, config_str: &String, config_type: &PipeConfigType) -> Result<LazyFrame, String> {
@@ -140,7 +147,6 @@ impl LazyFrameFactory {
                     Series::new("hello", [1,2,3]),
                     Series::new("b", [2,3,4]),
                 ]).unwrap(); 
-                log("Result<LazyFrame> obtained");
                 let lf = Ok(df_.lazy());
                 // let lf = match LazyCsvReader::new(config.path.clone()).finish() {
                 //     Ok(lf) => Ok(lf),
