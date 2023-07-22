@@ -98,10 +98,11 @@ pub enum PipeConfig {
     // StringToDate,
 }
 
-#[wasm_bindgen]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+// #[wasm_bindgen]
+// #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LazyFrameFactory {
     pipe_configs: HashMap<String, (PipeConfigType, String)>,
+    lazy_frames: HashMap<String, LazyFrame>,
     // pipe_configs: HashMap<String, PipeConfig>,
 }
 
@@ -118,13 +119,76 @@ pub struct DataTable2<T> {
     data: Vec<HashMap<String, T>>
 }
 
-#[wasm_bindgen]
-pub fn do_thing() -> Result<JsValue, JsValue> {
-    let mut lff = LazyFrameFactory {
-        pipe_configs: HashMap::new()
+// #[wasm_bindgen]
+// pub fn do_thing() -> Result<JsValue, JsValue> {
+//     let mut lff = LazyFrameFactory {
+//         pipe_configs: HashMap::new(),
+//         lazy_frames: HashMap::new(),
+//     };
+//     lff.pipe_configs.insert("SourceOne".into(), (PipeConfigType::SourceCsv, "{\"path\": \"hello.csv\"}".into()));
+//     Ok(serde_wasm_bindgen::to_value(&lff.create_lazy_frame(String::from("SourceOne")).unwrap())?)
+// }
+
+// fn append_series<T>(map: HashMap<String, Vec<Option<T>>>, mut series_vec: Vec<Series>) {
+//     map.iter().for_each(|(name, values)| {
+//         series_vec.push(Series::new(name, values))
+//     });
+// }
+
+fn data_table_to_frame(table: &DataTable) -> LazyFrame {
+    let mut series_vec: Vec<Series> = Vec::new();
+    match &table.f64 {
+        None => (),
+        Some(x) => {
+            x.iter().for_each(|(name, values)| {
+                series_vec.push(Series::new(name, values))
+            })
+        }
     };
-    lff.pipe_configs.insert("SourceOne".into(), (PipeConfigType::SourceCsv, "{\"path\": \"hello.csv\"}".into()));
-    Ok(serde_wasm_bindgen::to_value(&lff.create_lazy_frame(String::from("SourceOne")).unwrap())?)
+    match &table.i64 {
+        None => (),
+        Some(x) => {
+            x.iter().for_each(|(name, values)| {
+                series_vec.push(Series::new(name, values))
+            })
+        }
+    };
+    match &table.str {
+        None => (),
+        Some(x) => {
+            x.iter().for_each(|(name, values)| {
+                series_vec.push(Series::new(name, values))
+            })
+        }
+    };
+    match &table.datetime {
+        None => (),
+        Some(x) => {
+            x.iter().for_each(|(name, values)| {
+                series_vec.push(Series::new(name, values))
+            })
+        }
+    };
+    DataFrame::new(series_vec).unwrap().lazy()
+}
+
+#[wasm_bindgen]
+pub fn run_data_pipeline(pipe_ids: JsValue, input_data: JsValue, configs: JsValue) -> Result<JsValue, JsValue> {
+    let pipe_configs: HashMap<String, (PipeConfigType, String)> = serde_wasm_bindgen::from_value(configs).unwrap();
+    let pipes: Vec<String> = serde_wasm_bindgen::from_value(pipe_ids).unwrap();
+    let inputs: HashMap<String, DataTable> = serde_wasm_bindgen::from_value(input_data).unwrap();
+    let mut lazy_inputs: HashMap<String, LazyFrame> = HashMap::new();
+    for (key, value) in inputs.iter() {
+        lazy_inputs.insert(key.to_string(), data_table_to_frame(value));
+    }
+
+    // todo!();
+    let lff = LazyFrameFactory {
+        pipe_configs,
+        lazy_frames: lazy_inputs,
+    };
+
+    Ok(serde_wasm_bindgen::to_value(&lff.create_lazy_frame(pipes.iter().next().unwrap()).unwrap()).unwrap())
 }
 
 #[wasm_bindgen]
@@ -143,10 +207,10 @@ pub fn do_thing_2(val: JsValue) -> Result<(), JsValue> {
 // pub type DataTable<T> = HashMap<String, Vec<T>>;
 
 impl LazyFrameFactory {
-    pub fn create_lazy_frame(self: &Self, pipe_id: String) -> Result<DataTable, String> {
+    pub fn create_lazy_frame(self: &Self, pipe_id: &String) -> Result<DataTable, String> {
     // pub fn create_lazy_frame(self: &Self, pipe_id: String) -> Result<LazyFrame, String> {
         log("Start create_lazy_frame");
-        let _result_lf = match self.pipe_configs.get(&pipe_id) {
+        let _result_lf = match self.pipe_configs.get(pipe_id) {
             Some((config_type, config_str)) => self.recurse(&config_str, config_type),
             None => Err(format!("No pipe with id {} found in pipe_configs", pipe_id)),
         }.unwrap();

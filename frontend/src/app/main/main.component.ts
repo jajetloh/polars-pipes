@@ -87,8 +87,8 @@ export class MainComponent {
         // console.log(r)
 
         // console.log(p.do_thing(in))
-        const raw: DataTypeArrays = p.do_thing()
-        console.log(fromDataTypeArrays(raw))
+        // const raw: DataTypeArrays = p.do_thing()
+        // console.log(fromDataTypeArrays(raw))
 
         // const columnIters: { name: string, iterRef: any[] }[] = []
         // // Object.entries(raw)
