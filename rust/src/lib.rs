@@ -105,7 +105,7 @@ pub struct LazyFrameFactory {
     // pipe_configs: HashMap<String, PipeConfig>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DataTable {
     f64: Option<HashMap<String, Vec<Option<f64>>>>,
     i64: Option<HashMap<String, Vec<Option<i64>>>>,
@@ -125,6 +125,19 @@ pub fn do_thing() -> Result<JsValue, JsValue> {
     };
     lff.pipe_configs.insert("SourceOne".into(), (PipeConfigType::SourceCsv, "{\"path\": \"hello.csv\"}".into()));
     Ok(serde_wasm_bindgen::to_value(&lff.create_lazy_frame(String::from("SourceOne")).unwrap())?)
+}
+
+#[wasm_bindgen]
+pub fn do_thing_2(val: JsValue) -> Result<(), JsValue> {
+    log("do_thing_2");
+    log(&format!("{:?}", val));
+    let example: DataTable = match serde_wasm_bindgen::from_value(val) {
+        Ok(x) => x,
+        Err(e) => return Err(e.to_string().into()),
+    };
+    log(&format!("!!! {:?}", example));
+    // do_thing()
+    Ok(())
 }
 
 // pub type DataTable<T> = HashMap<String, Vec<T>>;
