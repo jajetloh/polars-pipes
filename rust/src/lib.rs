@@ -42,13 +42,12 @@ extern "C" {
     fn log_many(a: &str, b: &str);
 }
 
-#[wasm_bindgen]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SourceCsvPipeConfig {
     path: String,
+    source_id: String,
 }
 
-#[wasm_bindgen]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct BinaryCalculationPipeConfig {
     pipe_id: String,
@@ -57,7 +56,6 @@ pub struct BinaryCalculationPipeConfig {
     column_2: String,
 }
 
-#[wasm_bindgen]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct JoinPipeConfig {
     left_pipe_id: String,
@@ -65,7 +63,6 @@ pub struct JoinPipeConfig {
     on: Vec<String>,
 }
 
-#[wasm_bindgen]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct StringToDatePipeConfig {
     pipe_id: String,
@@ -74,15 +71,15 @@ pub struct StringToDatePipeConfig {
     format: String,
 }
 
-#[wasm_bindgen]
 #[derive(Debug, Clone, Deserialize, Serialize)]
-// #[serde(tag="type")]
-// pub enum PipeConfig {
-//     SourceCsv(SourceCsvPipeConfig),
-//     BinaryCalculation(BinaryCalculationPipeConfig),
-//     Join(JoinPipeConfig),
-//     StringToDate(StringToDatePipeConfig),
-// }
+#[serde(tag="type")]
+pub enum PipeConfig {
+    SourceCsv(SourceCsvPipeConfig),
+    BinaryCalculation(BinaryCalculationPipeConfig),
+    Join(JoinPipeConfig),
+    // StringToDate(StringToDatePipeConfig),
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum PipeConfigType {
     SourceCsv,
     BinaryCalculation,
@@ -90,13 +87,13 @@ pub enum PipeConfigType {
     // StringToDate,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub enum PipeConfig {
-    SourceCsv,
-    BinaryCalculation,
-    Join,
-    // StringToDate,
-}
+// #[derive(Debug, Clone, Deserialize, Serialize)]
+// pub enum PipeConfig {
+//     SourceCsv,
+//     BinaryCalculation,
+//     Join,
+//     // StringToDate,
+// }
 
 // #[wasm_bindgen]
 // #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -108,10 +105,10 @@ pub struct LazyFrameFactory {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DataTable {
-    f64: Option<HashMap<String, Vec<Option<f64>>>>,
-    i64: Option<HashMap<String, Vec<Option<i64>>>>,
-    str: Option<HashMap<String, Vec<Option<String>>>>,
-    datetime: Option<HashMap<String, Vec<Option<i64>>>>,
+    f64: HashMap<String, Vec<Option<f64>>>,
+    i64: HashMap<String, Vec<Option<i64>>>,
+    str: HashMap<String, Vec<Option<String>>>,
+    datetime: HashMap<String, Vec<Option<i64>>>,
 }
 
 #[derive(Serialize)]
@@ -137,56 +134,123 @@ pub struct DataTable2<T> {
 
 fn data_table_to_frame(table: &DataTable) -> LazyFrame {
     let mut series_vec: Vec<Series> = Vec::new();
-    match &table.f64 {
-        None => (),
-        Some(x) => {
-            x.iter().for_each(|(name, values)| {
-                series_vec.push(Series::new(name, values))
-            })
-        }
-    };
-    match &table.i64 {
-        None => (),
-        Some(x) => {
-            x.iter().for_each(|(name, values)| {
-                series_vec.push(Series::new(name, values))
-            })
-        }
-    };
-    match &table.str {
-        None => (),
-        Some(x) => {
-            x.iter().for_each(|(name, values)| {
-                series_vec.push(Series::new(name, values))
-            })
-        }
-    };
-    match &table.datetime {
-        None => (),
-        Some(x) => {
-            x.iter().for_each(|(name, values)| {
-                series_vec.push(Series::new(name, values))
-            })
-        }
-    };
+    table.f64.iter().for_each(|(name, values)| {
+        series_vec.push(Series::new(name, values))
+    });
+    table.i64.iter().for_each(|(name, values)| {
+        series_vec.push(Series::new(name, values))
+    });
+    table.str.iter().for_each(|(name, values)| {
+        series_vec.push(Series::new(name, values))
+    });
+    table.datetime.iter().for_each(|(name, values)| {
+        series_vec.push(Series::new(name, values))
+    });
+    // match &table.f64 {
+    //     None => (),
+    //     Some(x) => {
+    //         x.iter().for_each(|(name, values)| {
+    //             series_vec.push(Series::new(name, values))
+    //         })
+    //     }
+    // };
+    // match &table.i64 {
+    //     None => (),
+    //     Some(x) => {
+    //         x.iter().for_each(|(name, values)| {
+    //             series_vec.push(Series::new(name, values))
+    //         })
+    //     }
+    // };
+    // match &table.str {
+    //     None => (),
+    //     Some(x) => {
+    //         x.iter().for_each(|(name, values)| {
+    //             series_vec.push(Series::new(name, values))
+    //         })
+    //     }
+    // };
+    // match &table.datetime {
+    //     None => (),
+    //     Some(x) => {
+    //         x.iter().for_each(|(name, values)| {
+    //             series_vec.push(Series::new(name, values))
+    //         })
+    //     }
+    // };
     DataFrame::new(series_vec).unwrap().lazy()
 }
 
+fn data_frame_to_table(lf: LazyFrame) -> Result<DataTable, String> {
+    let mut data_table = DataTable {
+        f64: HashMap::new(),
+        i64: HashMap::new(),
+        str: HashMap::new(),
+        datetime: HashMap::new(),
+    };
+
+    let frame = lf.collect().unwrap();
+    let schema = frame.schema();
+    let mut schema_dtype_iter = schema.iter_dtypes();
+    let mut column_iters = frame.iter();
+    for i in 0..frame.width() {
+        let dtype = schema_dtype_iter.next().unwrap();
+        let column = column_iters.next().unwrap();
+        match dtype {
+            DataType::Float64 => {
+                let values = column.f64().unwrap().into_iter().collect();
+                data_table.f64.insert(column.name().into(), values);
+            },
+            DataType::Int64 => {
+                let values = column.i64().unwrap().into_iter().collect();
+                data_table.i64.insert(column.name().into(), values);
+            },
+            DataType::Utf8 => {
+                let values = column.utf8().unwrap().into_iter().map(|x| match x { None => None, Some(y) => Some(y.to_string())}).collect();
+                data_table.str.insert(column.name().into(), values);
+            },
+            // TODO: Handle dates...
+            _ => return Err("!!".into()),
+        }
+    };
+    Ok(data_table)
+    // for _ in 0..frame.height() {
+        
+    // }
+    // todo!()
+}
+
 #[wasm_bindgen]
-pub fn run_data_pipeline(pipe_ids: JsValue, input_data: JsValue, configs: JsValue) -> Result<JsValue, JsValue> {
-    let pipe_configs: HashMap<String, (PipeConfigType, String)> = serde_wasm_bindgen::from_value(configs).unwrap();
-    let pipes: Vec<String> = serde_wasm_bindgen::from_value(pipe_ids).unwrap();
-    let inputs: HashMap<String, DataTable> = serde_wasm_bindgen::from_value(input_data).unwrap();
+pub fn run_data_pipeline(pipe_ids: JsValue, input_data: JsValue, configs: JsValue, test_object: JsValue) -> Result<JsValue, JsValue> {
+    log("start run_data_pipeline");
+    let test_object_2: HashMap<String, (f64, f64, String, PipeConfigType, PipeConfig)> = match serde_wasm_bindgen::from_value(test_object) {
+        Ok(x) => { log(&format!("Oh yeah {:?}", x)); x },
+        Err(e) => { log(&format!("Error parsing test_object: {:?}", e)); return Err(e.into()) }
+    };
+    let pipe_configs: HashMap<String, (PipeConfigType, String)> = match serde_wasm_bindgen::from_value(configs) {
+        Ok(x) => x,
+        Err(e) => { log(&format!("Error parsing pipe_configs: {:?}", e)); return Err(e.into()) }
+    };
+    let pipes: Vec<String> = match serde_wasm_bindgen::from_value(pipe_ids) {
+        Ok(x) => x,
+        Err(e) => { log(&format!("Error parsing pipe_ids: {:?}", e)); return Err(e.into()) }
+    };
+    let inputs: HashMap<String, DataTable> = match serde_wasm_bindgen::from_value(input_data) {
+        Ok(x) => x,
+        Err(e) => { log(&format!("Error parsing input_data: {:?}", e)); return Err(e.into()) }
+    };
     let mut lazy_inputs: HashMap<String, LazyFrame> = HashMap::new();
     for (key, value) in inputs.iter() {
         lazy_inputs.insert(key.to_string(), data_table_to_frame(value));
     }
+    log("lazy_inputs ready");
 
     // todo!();
     let lff = LazyFrameFactory {
         pipe_configs,
         lazy_frames: lazy_inputs,
     };
+    // let lf = lff.create_lazy_frame(pipes.iter().next().unwrap()).unwrap()
 
     Ok(serde_wasm_bindgen::to_value(&lff.create_lazy_frame(pipes.iter().next().unwrap()).unwrap()).unwrap())
 }
@@ -210,24 +274,26 @@ impl LazyFrameFactory {
     pub fn create_lazy_frame(self: &Self, pipe_id: &String) -> Result<DataTable, String> {
     // pub fn create_lazy_frame(self: &Self, pipe_id: String) -> Result<LazyFrame, String> {
         log("Start create_lazy_frame");
-        let _result_lf = match self.pipe_configs.get(pipe_id) {
+        let result_lf = match self.pipe_configs.get(pipe_id) {
             Some((config_type, config_str)) => self.recurse(&config_str, config_type),
             None => Err(format!("No pipe with id {} found in pipe_configs", pipe_id)),
         }.unwrap();
         log("End create_lazy_frame");
+        return Ok(data_frame_to_table(result_lf).unwrap())
+        // let data_table = data
         // return Ok(String::from("wow"))
 
-        let c = DataTable {
-            f64: Some(HashMap::from([
-                ("col1".into(), vec![Some(1.23), Some(2.34), Some(3.45), Some(4.56)]),
-                ("col5".into(), vec![Some(0.23), Some(0.34), Some(0.45), Some(0.56)]),
-            ])),
-            i64: Some(HashMap::from([("col2".into(), vec![Some(5),Some(6),Some(7),Some(8)])])),
-            str: Some(HashMap::from([("col3".into(), vec![Some("hello".into()), Some("fwo".into()), None, Some("fe2f".into())])])),
-            // datetime: Some(HashMap::from([("col4".into(), vec![Some(NaiveDate::from_ymd_opt(2023,1,1).unwrap().and_hms_opt(1,2,3).unwrap()), None, None, None])])),
-            datetime: Some(HashMap::from([("col4".into(), vec![Some(5),Some(6),Some(7),Some(8)])])),
-        };
-        return Ok(c)
+        // let c = DataTable {
+        //     f64: HashMap::from([
+        //         ("col1".into(), vec![Some(1.23), Some(2.34), Some(3.45), Some(4.56)]),
+        //         ("col5".into(), vec![Some(0.23), Some(0.34), Some(0.45), Some(0.56)]),
+        //     ]),
+        //     i64: HashMap::from([("col2".into(), vec![Some(5),Some(6),Some(7),Some(8)])]),
+        //     str: HashMap::from([("col3".into(), vec![Some("hello".into()), Some("fwo".into()), None, Some("fe2f".into())])]),
+        //     // datetime: Some(HashMap::from([("col4".into(), vec![Some(NaiveDate::from_ymd_opt(2023,1,1).unwrap().and_hms_opt(1,2,3).unwrap()), None, None, None])])),
+        //     datetime: HashMap::from([("col4".into(), vec![Some(5),Some(6),Some(7),Some(8)])]),
+        // };
+        // return Ok(c)
 
         // let mut c: HashMap<String, Vec<f64 | String>> = HashMap::new();
         // c.insert("column1".into(), vec![Some(0.123), Some(0.234), None]);
@@ -254,18 +320,19 @@ impl LazyFrameFactory {
                     Ok(x) => x,
                     Err(e) => { log(&format!("ohno! Error when parsing config: {:?}", e)); return Err(e.to_string()) },
                 };
-                log(&format!("{:?}", config));
-                let df_ = DataFrame::new(vec![
-                    Series::new("hello", [1,2,3]),
-                    Series::new("b", [2,3,4]),
-                ]).unwrap(); 
-                let lf = Ok(df_.lazy());
+                Ok(self.lazy_frames.get(&config.source_id).unwrap().clone())
+                // log(&format!("{:?}", config));
+                // let df_ = DataFrame::new(vec![
+                //     Series::new("hello", [1,2,3]),
+                //     Series::new("b", [2,3,4]),
+                // ]).unwrap(); 
+                // let lf = Ok(df_.lazy());
                 // let lf = match LazyCsvReader::new(config.path.clone()).finish() {
                 //     Ok(lf) => Ok(lf),
                 //     Err(e) => { println!("Error when scanning csv at path {}: {}", config.path, e); return Err(e.to_string()) },
                 // };
-                log("Result<LazyFrame> obtained");
-                lf
+                // log("Result<LazyFrame> obtained");
+                // lf
             },
             PipeConfigType::BinaryCalculation => {
                 let config = from_str::<BinaryCalculationPipeConfig>(&config_str).unwrap();

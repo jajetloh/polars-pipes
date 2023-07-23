@@ -1,14 +1,13 @@
 import { Component } from '@angular/core'
 import * as polarsPipes from 'polars-pipes'
-import { max } from "rxjs"
 
 type Option<T> = (T | undefined)
 
 interface DataTypeArrays {
-    f64: Option<Map<string, Option<number>[]>>,
-    i64: Option<Map<string, Option<number>[]>>,
-    str: Option<Map<string, Option<string>[]>>,
-    datetime: Option<Map<string, Option<number>[]>>,
+    f64: Map<string, Option<number>[]>,
+    i64: Map<string, Option<number>[]>,
+    str: Map<string, Option<string>[]>,
+    datetime: Map<string, Option<number>[]>,
 }
 
 function toDataTypeArrays(inputData: any[], columnSchema: {[k: string]: keyof DataTypeArrays}): DataTypeArrays {
@@ -59,6 +58,33 @@ enum ColumnType {
 })
 export class MainComponent {
     constructor() {
+    }
+
+    onClick3() {
+        // const pipeConfigs = {
+        //     source1: ['SourceCsv', { path: '.', source_id: 'myFirstSource' }],
+        //     source2: ['SourceCsv', { path: '.', source_id: 'myFirstSource' }],
+        // }
+        const csvConfig = {
+            type: 'SourceCsv',
+            path: 'f',
+            source_id: 'g',
+        }
+        const testObject = {
+            source1: [1,2, 'woo', 'SourceCsv', csvConfig],
+            source2: [2,3, 'yow', 'SourceCsv', csvConfig] ,
+        }
+        // const testObject = new Map<string, any>()
+        // testObject.set('source1', 'hello there')
+        // testObject.set('source2', 'www there')
+
+        const pipeConfigs = new Map<string, any>()
+        pipeConfigs.set('source1', ['SourceCsv', { path: '.', source_id: 'myFirstSource' }])
+        pipeConfigs.set('source2', ['SourceCsv', { path: '..', source_id: 'mySecondSource' }])
+        const inputData = {
+             myFirstSource: [{ name: 'Andrew', score: 1.23 }, { name: 'Beth', score: 2.34 }, { name: 'Connor', score: undefined }]
+        }
+        polarsPipes.run_data_pipeline('source1', inputData, pipeConfigs, testObject)
     }
 
     onClick2() {
