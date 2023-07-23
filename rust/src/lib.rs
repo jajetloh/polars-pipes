@@ -98,9 +98,9 @@ pub enum PipeConfigType {
 // #[wasm_bindgen]
 // #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LazyFrameFactory {
-    pipe_configs: HashMap<String, (PipeConfigType, String)>,
+    // pipe_configs: HashMap<String, (PipeConfigType, String)>,
     lazy_frames: HashMap<String, LazyFrame>,
-    // pipe_configs: HashMap<String, PipeConfig>,
+    pipe_configs: HashMap<String, PipeConfig>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -221,13 +221,13 @@ fn data_frame_to_table(lf: LazyFrame) -> Result<DataTable, String> {
 }
 
 #[wasm_bindgen]
-pub fn run_data_pipeline(pipe_ids: JsValue, input_data: JsValue, configs: JsValue, test_object: JsValue) -> Result<JsValue, JsValue> {
+pub fn run_data_pipeline(pipe_ids: JsValue, input_data: JsValue, configs: JsValue) -> Result<JsValue, JsValue> {
     log("start run_data_pipeline");
-    let test_object_2: HashMap<String, (f64, f64, String, PipeConfigType, PipeConfig)> = match serde_wasm_bindgen::from_value(test_object) {
-        Ok(x) => { log(&format!("Oh yeah {:?}", x)); x },
-        Err(e) => { log(&format!("Error parsing test_object: {:?}", e)); return Err(e.into()) }
-    };
-    let pipe_configs: HashMap<String, (PipeConfigType, String)> = match serde_wasm_bindgen::from_value(configs) {
+    // let test_object_2: HashMap<String, (f64, f64, String, PipeConfigType, PipeConfig)> = match serde_wasm_bindgen::from_value(test_object) {
+    //     Ok(x) => { log(&format!("Oh yeah {:?}", x)); x },
+    //     Err(e) => { log(&format!("Error parsing test_object: {:?}", e)); return Err(e.into()) }
+    // };
+    let pipe_configs: HashMap<String, PipeConfig> = match serde_wasm_bindgen::from_value(configs) {
         Ok(x) => x,
         Err(e) => { log(&format!("Error parsing pipe_configs: {:?}", e)); return Err(e.into()) }
     };
@@ -275,7 +275,8 @@ impl LazyFrameFactory {
     // pub fn create_lazy_frame(self: &Self, pipe_id: String) -> Result<LazyFrame, String> {
         log("Start create_lazy_frame");
         let result_lf = match self.pipe_configs.get(pipe_id) {
-            Some((config_type, config_str)) => self.recurse(&config_str, config_type),
+            // Some((config_type, config_str)) => self.recurse(&config_str, config_type),
+            Some(config) => self.recurse(&config),
             None => Err(format!("No pipe with id {} found in pipe_configs", pipe_id)),
         }.unwrap();
         log("End create_lazy_frame");
@@ -310,17 +311,28 @@ impl LazyFrameFactory {
         // return Ok(vec![0.,1.,2.,3.])
     }
 
-    fn recurse(self: &Self, config_str: &String, config_type: &PipeConfigType) -> Result<LazyFrame, String> {
+    fn recurse(self: &Self, c: &PipeConfig) -> Result<LazyFrame, String> {
+    // fn recurse(self: &Self, config_str: &String, config_type: &PipeConfigType) -> Result<LazyFrame, String> {
         log("Start recurse");
-        match config_type {
-            PipeConfigType::SourceCsv => {
+        match c {
+            PipeConfig::SourceCsv(config) => {
                 log("Matched to SourceCSV");
-                log(&format!("Config is {:?}", config_str));
-                let config = match from_str::<SourceCsvPipeConfig>(&config_str) {
-                    Ok(x) => x,
-                    Err(e) => { log(&format!("ohno! Error when parsing config: {:?}", e)); return Err(e.to_string()) },
-                };
-                Ok(self.lazy_frames.get(&config.source_id).unwrap().clone())
+                log(&format!("Config is {:?}", config));
+                // let config = match from_str::<SourceCsvPipeConfig>(&config_str) {
+                //     Ok(x) => x,
+                //     Err(e) => { log(&format!("ohno! Error when parsing config: {:?}", e)); return Err(e.to_string()) },
+                // };
+                let data_lf = match self.lazy_frames.get(&config.source_id) {
+                    Some(x) => x,
+                    None => {
+                        let msg = format!("No data source with id {:?} was found in inputs array.", config.source_id);
+                        log(&msg);
+                        return Err(msg)
+                    },
+                }.clone();
+                log("SourceCsv data_lf successful");
+                Ok(data_lf)
+                // Ok(self.lazy_frames.get(&config.source_id).unwrap().clone())
                 // log(&format!("{:?}", config));
                 // let df_ = DataFrame::new(vec![
                 //     Series::new("hello", [1,2,3]),
@@ -334,33 +346,34 @@ impl LazyFrameFactory {
                 // log("Result<LazyFrame> obtained");
                 // lf
             },
-            PipeConfigType::BinaryCalculation => {
-                let config = from_str::<BinaryCalculationPipeConfig>(&config_str).unwrap();
-                let (upstream_config_type, upstream_config) = match self.pipe_configs.get(&config.pipe_id) {
+            PipeConfig::BinaryCalculation(config) => {
+                // let config = from_str::<BinaryCalculationPipeConfig>(&config_str).unwrap();
+                let upstream_config = match self.pipe_configs.get(&config.pipe_id) {
+                // let (upstream_config_type, upstream_config) = match self.pipe_configs.get(&config.pipe_id) {
                     Some(c) => c.clone(),
                     None => { println!("Pipe id {} not found", config.pipe_id); return Err(format!("Pipe id {} not found", config.pipe_id)) },
                 };
-                let lf = match self.recurse(&upstream_config, &upstream_config_type) {
+                let lf = match self.recurse(&upstream_config) {
                     Ok(lf) => lf,
                     Err(e) => return Err(e),
                 };
                 Ok(lf.with_column((col(&config.column_1) + col(&config.column_2)).alias(&config.new_column)))
             },
-            PipeConfigType::Join => {
-                let config = from_str::<JoinPipeConfig>(&config_str).unwrap();
-                let (left_config_type, left_config) = match self.pipe_configs.get(&config.left_pipe_id) {
+            PipeConfig::Join(config) => {
+                // let config = from_str::<JoinPipeConfig>(&config_str).unwrap();
+                let left_config = match self.pipe_configs.get(&config.left_pipe_id) {
                     Some(c) => c,
                     None => { println!("Could not find pipe_id {} in pipe_configs", config.left_pipe_id); return Err(format!("Could not find pipe_id {} in pipe_configs", config.left_pipe_id)) },
                 };
-                let (right_config_type, right_config) = match self.pipe_configs.get(&config.right_pipe_id) {
+                let right_config = match self.pipe_configs.get(&config.right_pipe_id) {
                     Some(c) => c,
                     None => { println!("Could not find pipe_id {} in pipe_configs", config.right_pipe_id); return Err(format!("Could not find pipe_id {} in pipe_configs", config.right_pipe_id)) },
                 };
-                let left_lf = match self.recurse(&left_config, &left_config_type) {
+                let left_lf = match self.recurse(&left_config) {
                     Ok(lf) => lf,
                     Err(e) => return Err(e),
                 };
-                let right_lf = match self.recurse(&right_config, &right_config_type) {
+                let right_lf = match self.recurse(&right_config) {
                     Ok(lf) => lf,
                     Err(e) => return Err(e),
                 };

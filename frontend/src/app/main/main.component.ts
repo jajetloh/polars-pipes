@@ -65,26 +65,39 @@ export class MainComponent {
         //     source1: ['SourceCsv', { path: '.', source_id: 'myFirstSource' }],
         //     source2: ['SourceCsv', { path: '.', source_id: 'myFirstSource' }],
         // }
-        const csvConfig = {
-            type: 'SourceCsv',
-            path: 'f',
-            source_id: 'g',
-        }
-        const testObject = {
-            source1: [1,2, 'woo', 'SourceCsv', csvConfig],
-            source2: [2,3, 'yow', 'SourceCsv', csvConfig] ,
-        }
+        // const csvConfig = {
+        //     type: 'SourceCsv',
+        //     path: 'f',
+        //     source_id: 'g',
+        // }
+        // const testObject = {
+        //     source1: [1,2, 'woo', 'SourceCsv', csvConfig],
+        //     source2: [2,3, 'yow', 'SourceCsv', csvConfig] ,
+        // }
         // const testObject = new Map<string, any>()
         // testObject.set('source1', 'hello there')
         // testObject.set('source2', 'www there')
 
-        const pipeConfigs = new Map<string, any>()
-        pipeConfigs.set('source1', ['SourceCsv', { path: '.', source_id: 'myFirstSource' }])
-        pipeConfigs.set('source2', ['SourceCsv', { path: '..', source_id: 'mySecondSource' }])
-        const inputData = {
-             myFirstSource: [{ name: 'Andrew', score: 1.23 }, { name: 'Beth', score: 2.34 }, { name: 'Connor', score: undefined }]
+        // const pipeConfigs = new Map<string, any>()
+        // pipeConfigs.set('source1', ['SourceCsv', { path: '.', source_id: 'myFirstSource' }])
+        // pipeConfigs.set('source2', ['SourceCsv', { path: '..', source_id: 'mySecondSource' }])
+        const pipeConfigs = {
+            source1: { type: 'SourceCsv', path: '.', source_id: 'myFirstSource' },
+            source2: { type: 'SourceCsv', path: '.', source_id: 'mySecondSource' },
+            join1: { type: 'Join', left_pipe_id: 'source1', right_pipe_id: 'source2', on: ['name'] },
         }
-        polarsPipes.run_data_pipeline('source1', inputData, pipeConfigs, testObject)
+        const inputData = {
+             myFirstSource: toDataTypeArrays(
+                 [{ name: 'Andrew', score: 1.23 }, { name: 'Beth', score: undefined }, { name: 'Connor', score: 2.34 }],
+                 { name: 'str', score: 'f64' },
+             ),
+            mySecondSource: toDataTypeArrays(
+                [{ name: 'Andrew', grade: 5 }, { name: 'Beth', grade: 4 }, { name: 'David', grade: 3 }],
+                { name: 'str', grade: 'i64' }
+            )
+        }
+        const result = polarsPipes.run_data_pipeline(['join1'], inputData, pipeConfigs)
+        console.log('RESULT IS', fromDataTypeArrays(result))
     }
 
     onClick2() {
