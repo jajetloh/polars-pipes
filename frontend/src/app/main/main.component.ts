@@ -1,4 +1,4 @@
-import { Component } from '@angular/core'
+import { Component, OnInit } from '@angular/core'
 import * as polarsPipes from 'polars-pipes'
 
 type Option<T> = (T | undefined)
@@ -56,8 +56,27 @@ enum ColumnType {
     templateUrl: './main.component.html',
     styleUrls: ['./main.component.css']
 })
-export class MainComponent {
+export class MainComponent implements OnInit {
+
+    allNames = ['Alex', 'Beth', 'Carter', 'Diane', 'Eddy', 'Fiona', 'Gary', 'Hayley']
+    allSubjects = ['English', 'Maths', 'Sport', 'Politics', 'Drama', 'Music', 'Chemistry', 'Physics', 'Biology', 'Geography', 'Computer Science']
+    allSemesters = [1, 2, 3, 4, 5, 6, 7, 8]
+    studentScores: any[] = []
+    subjectMultipliers: any[] = []
     constructor() {
+    }
+
+    ngOnInit() {
+        this.allNames.forEach((name, i) => {
+            this.allSubjects.forEach((subject, j) => {
+                this.studentScores.push({ name, subject, score: i + j })
+            })
+        })
+        this.allSubjects.forEach((subject, i) => {
+            this.allSemesters.forEach((semester, j) => {
+                this.subjectMultipliers.push({ subject, semester, multiplier: 1 + (i * j / 100)})
+            })
+        })
     }
 
     onClick() {
@@ -65,6 +84,10 @@ export class MainComponent {
             source1: { type: 'SourceCsv', path: '.', source_id: 'myFirstSource' },
             source2: { type: 'SourceCsv', path: '.', source_id: 'mySecondSource' },
             join1: { type: 'Join', left_pipe_id: 'source1', right_pipe_id: 'source2', on: ['name'] },
+            studentScoresSource: { type: 'SourceCsv', path: '', source_id: 'studentScores' },
+            subjectMultipliersSource: { type: 'SourceCsv', path: '', source_id: 'subjectMultipliers' },
+            scoresJoinMultipliers: { type: 'Join', left_pipe_id: 'studentScoresSource', right_pipe_id: 'subjectMultipliersSource', on: ['subject'] },
+            adjustedScores: { type: 'BinaryCalculation', pipe_id: 'scoresJoinMultipliers', new_column: 'adjustedScore', column_1: 'score', column_2: 'multiplier' },
         }
         const inputData = {
              myFirstSource: toDataTypeArrays(
@@ -74,9 +97,11 @@ export class MainComponent {
             mySecondSource: toDataTypeArrays(
                 [{ name: 'Andrew', grade: 5 }, { name: 'Beth', grade: 4 }, { name: 'David', grade: 3 }],
                 { name: 'str', grade: 'i64' }
-            )
+            ),
+            studentScores: toDataTypeArrays(this.studentScores, { name: 'str', subject: 'str', score: 'f64' }),
+            subjectMultipliers: toDataTypeArrays(this.subjectMultipliers, { subject: 'str', semester: 'i64', multiplier: 'f64' }),
         }
-        const result = polarsPipes.run_data_pipeline(['join1'], inputData, pipeConfigs)
+        const result = polarsPipes.run_data_pipeline(['adjustedScores'], inputData, pipeConfigs)
         console.log('RESULT IS', fromDataTypeArrays(result))
     }
 }

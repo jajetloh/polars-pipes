@@ -7,6 +7,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::from_str;
 use chrono::{NaiveDate, NaiveDateTime};
 
+extern crate console_error_panic_hook;
+use std::panic;
+
 // pub fn add(left: usize, right: usize) -> usize {
 //     left + right
 // }
@@ -123,7 +126,10 @@ fn data_frame_to_table(lf: LazyFrame) -> Result<DataTable, String> {
         datetime: HashMap::new(),
     };
 
-    let frame = lf.collect().unwrap();
+    let frame = match lf.collect() {
+        Ok(x) => x,
+        Err(e) => { log(&format!("{:?}", e)); return Err(e.to_string()) },
+    };
     let schema = frame.schema();
     let mut schema_dtype_iter = schema.iter_dtypes();
     let mut column_iters = frame.iter();
@@ -152,6 +158,8 @@ fn data_frame_to_table(lf: LazyFrame) -> Result<DataTable, String> {
 
 #[wasm_bindgen]
 pub fn run_data_pipeline(pipe_ids: JsValue, input_data: JsValue, configs: JsValue) -> Result<JsValue, JsValue> {
+    panic::set_hook(Box::new(console_error_panic_hook::hook));
+
     log("start run_data_pipeline");
     let pipe_configs: HashMap<String, PipeConfig> = match serde_wasm_bindgen::from_value(configs) {
         Ok(x) => x,
@@ -185,8 +193,13 @@ impl LazyFrameFactory {
             Some(config) => self.recurse(&config),
             None => Err(format!("No pipe with id {} found in pipe_configs", pipe_id)),
         }.unwrap();
+        log("Obtained result_lf");
+        let result_table = match data_frame_to_table(result_lf) {
+            Ok(x) => x,
+            Err(e) => { log(&format!("Error converting lazyframe to table formats {:?}", e)); return Err(e.into()) },
+        };
         log("End create_lazy_frame");
-        return Ok(data_frame_to_table(result_lf).unwrap())
+        return Ok(result_table)
     }
 
     fn recurse(self: &Self, c: &PipeConfig) -> Result<LazyFrame, String> {
