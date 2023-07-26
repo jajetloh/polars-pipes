@@ -81,32 +81,38 @@ export class MainComponent implements OnInit {
 
     onClick() {
         const pipeConfigs = {
-            source1: { type: 'SourceCsv', path: '.', source_id: 'myFirstSource' },
-            source2: { type: 'SourceCsv', path: '.', source_id: 'mySecondSource' },
-            join1: { type: 'Join', left_pipe_id: 'source1', right_pipe_id: 'source2', on: ['name'] },
-            studentScoresSource: { type: 'SourceCsv', path: '', source_id: 'studentScores' },
-            subjectMultipliersSource: { type: 'SourceCsv', path: '', source_id: 'subjectMultipliers' },
-            scoresJoinMultipliers: { type: 'Join', left_pipe_id: 'studentScoresSource', right_pipe_id: 'subjectMultipliersSource', on: ['subject'] },
-            adjustedScores: { type: 'BinaryCalculation', pipe_id: 'scoresJoinMultipliers', new_column: 'adjustedScore', column_1: 'score', column_2: 'multiplier' },
+            source1: { type: 'SourceCsv', path: '.', sourceId: 'myFirstSource' },
+            source2: { type: 'SourceCsv', path: '.', sourceId: 'mySecondSource' },
+            join1: { type: 'Join', leftPipeId: 'source1', rightPipeId: 'source2', on: ['name'] },
+            studentScoresSource: { type: 'SourceCsv', path: '', sourceId: 'studentScores' },
+            subjectMultipliersSource: { type: 'SourceCsv', path: '', sourceId: 'subjectMultipliers' },
+            scoresJoinMultipliers: { type: 'Join', leftPipeId: 'studentScoresSource', rightPipeId: 'subjectMultipliersSource', on: ['subject'] },
+            adjustedScores: { type: 'BinaryCalculation', pipeId: 'scoresJoinMultipliers', newColumn: 'adjustedScore', column1: 'score', column2: 'multiplier' },
             adjustedScoresSum: {
                 type: 'GroupAndReduce',
-                pipe_id: 'adjustedScores',
-                group_by: ['name', 'subject'],
+                pipeId: 'adjustedScores',
+                groupBy: ['name', 'subject'],
                 aggs: [
                     { name: 'total', type: 'Sum', value: 'adjustedScore' }
                 ]
             },
             adjustedScoresDerivedValues: {
                 type: 'DerivedValues',
-                pipe_id: 'adjustedScores',
+                pipeId: 'adjustedScores',
                 calcs: [
                     {
-                        new_property: 'hello',
-                        // expression: { Variable: { property: 'adjustedScore' } }
+                        newProperty: 'hello',
                         expression: {
-                            operation: 'Sum',
+                            operation: 'Subtract',
                             operands: [
-                                { property: 'adjustedScore' }, 100
+                                100,
+                                {
+                                    operation: 'Sum',
+                                    operands: [
+                                        { property: 'adjustedScore' },
+                                        { property: 'semester' },
+                                    ]
+                                }
                             ]
                         }
                     }

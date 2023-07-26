@@ -45,12 +45,14 @@ extern "C" {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SourceCsvPipeConfig {
     path: String,
     source_id: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BinaryCalculationPipeConfig {
     pipe_id: String,
     new_column: String,
@@ -59,12 +61,14 @@ pub struct BinaryCalculationPipeConfig {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DerivedValuesPipeConfig {
     pipe_id: String,
     calcs: Vec<DerivedValuesExpressionRoot>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 
 pub struct DerivedValuesExpressionRoot {
     new_property: String,
@@ -128,6 +132,7 @@ fn recurse_derived_expression(expression: DerivedValuesExpression) -> Result<Exp
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GroupAndReducePipeConfig {
     pipe_id: String,
     group_by: Vec<String>,
@@ -137,9 +142,6 @@ pub struct GroupAndReducePipeConfig {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 enum AggType {
     Sum,
-    // Min,
-    // Max,
-    // First,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -150,6 +152,7 @@ pub struct AggConfig {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct JoinPipeConfig {
     left_pipe_id: String,
     right_pipe_id: String,
@@ -157,6 +160,7 @@ pub struct JoinPipeConfig {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StringToDatePipeConfig {
     pipe_id: String,
     column_from: String,
@@ -182,6 +186,7 @@ pub enum PipeConfigType {
     Join,
     // StringToDate,
 }
+
 pub struct LazyFrameFactory {
     lazy_frames: HashMap<String, LazyFrame>,
     pipe_configs: HashMap<String, PipeConfig>,
