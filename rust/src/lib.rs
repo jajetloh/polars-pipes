@@ -1,7 +1,7 @@
 use wasm_bindgen::prelude::*;
 
 use std::collections::HashMap;
-use polars::prelude::{LazyFrame, col, JoinBuilder, JoinType, DataType, DataFrame, Series, NamedFrom, IntoLazy, PolarsDataType};
+use polars::{prelude::{LazyFrame, col, JoinBuilder, JoinType, DataType, DataFrame, Series, NamedFrom, IntoLazy, PolarsDataType}, lazy::dsl::Expr};
 
 use serde::{Deserialize, Serialize};
 use serde_json::from_str;
@@ -59,6 +59,28 @@ pub struct BinaryCalculationPipeConfig {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GroupAndReducePipeConfig {
+    pipe_id: String,
+    group_by: Vec<String>,
+    aggs: Vec<AggConfig>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+enum AggType {
+    Sum,
+    // Min,
+    // Max,
+    // First,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AggConfig {
+    name: String,
+    r#type: AggType,
+    value: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct JoinPipeConfig {
     left_pipe_id: String,
     right_pipe_id: String,
@@ -78,9 +100,11 @@ pub struct StringToDatePipeConfig {
 pub enum PipeConfig {
     SourceCsv(SourceCsvPipeConfig),
     BinaryCalculation(BinaryCalculationPipeConfig),
+    GroupAndReduce(GroupAndReducePipeConfig),
     Join(JoinPipeConfig),
     // StringToDate(StringToDatePipeConfig),
 }
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum PipeConfigType {
     SourceCsv,
@@ -229,6 +253,36 @@ impl LazyFrameFactory {
                     Err(e) => return Err(e),
                 };
                 Ok(lf.with_column((col(&config.column_1) + col(&config.column_2)).alias(&config.new_column)))
+            },
+            PipeConfig::GroupAndReduce(config) => {
+                let upstream_config = match self.pipe_configs.get(&config.pipe_id) {
+                    Some(c) => c.clone(),
+                    None => { println!("Pipe id {} not found", config.pipe_id); return Err(format!("Pipe id {} not found", config.pipe_id)) },
+                };
+                let lf = match self.recurse(&upstream_config) {
+                    Ok(lf) => lf,
+                    Err(e) => return Err(e),
+                };
+                let groupby = match config.group_by.len() {
+                    0 => { return Err("Cannot group by zero variables".into()) },
+                    1 => lf.groupby([ col(&config.group_by[0]) ]),
+                    2 => lf.groupby([ col(&config.group_by[0]), col(&config.group_by[1]) ]),
+                    3 => lf.groupby([ col(&config.group_by[0]), col(&config.group_by[1]), col(&config.group_by[2]) ]),
+                    4 => lf.groupby([ col(&config.group_by[0]), col(&config.group_by[1]), col(&config.group_by[2]), col(&config.group_by[3]) ]),
+                    5 => lf.groupby([ col(&config.group_by[0]), col(&config.group_by[1]), col(&config.group_by[2]), col(&config.group_by[3]), col(&config.group_by[4]) ]),
+                    6 => lf.groupby([ col(&config.group_by[0]), col(&config.group_by[1]), col(&config.group_by[2]), col(&config.group_by[3]), col(&config.group_by[4]), col(&config.group_by[5]) ]),
+                    _ => { return Err("Too many groupby variables. Need to implement.".into()) },
+                };
+                let lf_out = groupby.agg(
+                    config.clone().aggs.into_iter().map(|c| {
+                        match c.r#type {
+                            AggType::Sum => {
+                                col(&c.value).sum().alias(&c.name)
+                            },
+                        }
+                    }).collect::<Vec<_>>()
+                );
+                Ok(lf_out)
             },
             PipeConfig::Join(config) => {
                 let left_config = match self.pipe_configs.get(&config.left_pipe_id) {

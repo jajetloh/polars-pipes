@@ -88,6 +88,14 @@ export class MainComponent implements OnInit {
             subjectMultipliersSource: { type: 'SourceCsv', path: '', source_id: 'subjectMultipliers' },
             scoresJoinMultipliers: { type: 'Join', left_pipe_id: 'studentScoresSource', right_pipe_id: 'subjectMultipliersSource', on: ['subject'] },
             adjustedScores: { type: 'BinaryCalculation', pipe_id: 'scoresJoinMultipliers', new_column: 'adjustedScore', column_1: 'score', column_2: 'multiplier' },
+            adjustedScoresSum: {
+                type: 'GroupAndReduce',
+                pipe_id: 'adjustedScores',
+                group_by: ['name', 'subject'],
+                aggs: [
+                    { name: 'total', type: 'Sum', value: 'adjustedScore' }
+                ]
+            }
         }
         const inputData = {
              myFirstSource: toDataTypeArrays(
@@ -101,7 +109,8 @@ export class MainComponent implements OnInit {
             studentScores: toDataTypeArrays(this.studentScores, { name: 'str', subject: 'str', score: 'f64' }),
             subjectMultipliers: toDataTypeArrays(this.subjectMultipliers, { subject: 'str', semester: 'i64', multiplier: 'f64' }),
         }
-        const result = polarsPipes.run_data_pipeline(['adjustedScores'], inputData, pipeConfigs)
+        const result = polarsPipes.run_data_pipeline(['adjustedScoresSum'], inputData, pipeConfigs)
+        // const result = polarsPipes.run_data_pipeline(['adjustedScores'], inputData, pipeConfigs)
         console.log('RESULT IS', fromDataTypeArrays(result))
     }
 }
