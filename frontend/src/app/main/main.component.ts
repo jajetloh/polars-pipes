@@ -95,6 +95,22 @@ export class MainComponent implements OnInit {
                 aggs: [
                     { name: 'total', type: 'Sum', value: 'adjustedScore' }
                 ]
+            },
+            adjustedScoresDerivedValues: {
+                type: 'DerivedValues',
+                pipe_id: 'adjustedScores',
+                calcs: [
+                    {
+                        new_property: 'hello',
+                        // expression: { Variable: { property: 'adjustedScore' } }
+                        expression: {
+                            operation: 'Sum',
+                            operands: [
+                                { property: 'adjustedScore' }, 100
+                            ]
+                        }
+                    }
+                ]
             }
         }
         const inputData = {
@@ -109,7 +125,7 @@ export class MainComponent implements OnInit {
             studentScores: toDataTypeArrays(this.studentScores, { name: 'str', subject: 'str', score: 'f64' }),
             subjectMultipliers: toDataTypeArrays(this.subjectMultipliers, { subject: 'str', semester: 'i64', multiplier: 'f64' }),
         }
-        const result = polarsPipes.run_data_pipeline(['adjustedScoresSum'], inputData, pipeConfigs)
+        const result = polarsPipes.run_data_pipeline(['adjustedScoresDerivedValues'], inputData, pipeConfigs)
         // const result = polarsPipes.run_data_pipeline(['adjustedScores'], inputData, pipeConfigs)
         console.log('RESULT IS', fromDataTypeArrays(result))
     }

@@ -1,7 +1,7 @@
 use wasm_bindgen::prelude::*;
 
-use std::collections::HashMap;
-use polars::{prelude::{LazyFrame, col, JoinBuilder, JoinType, DataType, DataFrame, Series, NamedFrom, IntoLazy, PolarsDataType}, lazy::dsl::Expr};
+use std::{collections::HashMap, ops::Add};
+use polars::{prelude::{LazyFrame, col, lit, JoinBuilder, JoinType, DataType, DataFrame, Series, NamedFrom, IntoLazy}, lazy::dsl::Expr};
 
 use serde::{Deserialize, Serialize};
 use serde_json::from_str;
@@ -59,6 +59,75 @@ pub struct BinaryCalculationPipeConfig {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DerivedValuesPipeConfig {
+    pipe_id: String,
+    calcs: Vec<DerivedValuesExpressionRoot>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+
+pub struct DerivedValuesExpressionRoot {
+    new_property: String,
+    expression: DerivedValuesExpression,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub enum DerivedValuesOperationType {
+    Sum,
+    Subtract,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DerivedValuesOperation {
+    operation: DerivedValuesOperationType,
+    operands: Vec<DerivedValuesExpression>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DerivedValuesProperty {
+    property: String
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum DerivedValuesExpression {
+    Expression(DerivedValuesOperation),
+    Variable(DerivedValuesProperty),
+    Literal(f64),
+}
+
+fn recurse_derived_expression(expression: DerivedValuesExpression) -> Result<Expr, String> {
+    let polars_expr: Result<Expr, String> = match expression {
+        DerivedValuesExpression::Expression(e) => {
+            let operand_polars_exprs_result = e.operands.iter()
+                .map(|operand| recurse_derived_expression(operand.clone()))
+                .collect::<Result<Vec<Expr>, String>>();
+            let pl_exprs_vec: Vec<Expr> = match operand_polars_exprs_result {
+                Ok(x) => x,
+                Err(e) => return Err(e),
+            };
+            match e.operation {
+                DerivedValuesOperationType::Sum => {
+                    let sum_expr = pl_exprs_vec.iter().fold(lit(0), |acc: Expr, x: &Expr| {
+                        acc + x.clone()
+                    });
+                    return Ok(sum_expr)
+                },
+                DerivedValuesOperationType::Subtract => {
+                    let sub_expr = pl_exprs_vec.iter().skip(1).fold(pl_exprs_vec[0].clone(), |acc: Expr, x: &Expr| {
+                        acc - x.clone()
+                    });
+                    return Ok(sub_expr)
+                },
+            }
+        },
+        DerivedValuesExpression::Literal(x) => Ok(lit(x)),
+        DerivedValuesExpression::Variable(y) => Ok(col(&y.property))
+    };
+    return polars_expr
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct GroupAndReducePipeConfig {
     pipe_id: String,
     group_by: Vec<String>,
@@ -100,6 +169,7 @@ pub struct StringToDatePipeConfig {
 pub enum PipeConfig {
     SourceCsv(SourceCsvPipeConfig),
     BinaryCalculation(BinaryCalculationPipeConfig),
+    DerivedValues(DerivedValuesPipeConfig),
     GroupAndReduce(GroupAndReducePipeConfig),
     Join(JoinPipeConfig),
     // StringToDate(StringToDatePipeConfig),
@@ -253,6 +323,26 @@ impl LazyFrameFactory {
                     Err(e) => return Err(e),
                 };
                 Ok(lf.with_column((col(&config.column_1) + col(&config.column_2)).alias(&config.new_column)))
+            },
+            PipeConfig::DerivedValues(config) => {
+                let upstream_config = match self.pipe_configs.get(&config.pipe_id) {
+                    Some(c) => c.clone(),
+                    None => { println!("Pipe id {} not found", config.pipe_id); return Err(format!("Pipe id {} not found", config.pipe_id)) },
+                };
+                let lf = match self.recurse(&upstream_config) {
+                    Ok(lf) => lf,
+                    Err(e) => return Err(e),
+                };
+                let pl_exprs_vec: Vec<Expr> = match config.calcs.iter().map(|calc| {
+                    match recurse_derived_expression(calc.expression.clone()) {
+                        Ok(y) => Ok(y.alias(&calc.new_property)),
+                        Err(e) => Err(e),
+                    }
+                }).collect::<Result<Vec<Expr>, String>>() {
+                    Ok(x) => x,
+                    Err(e) => return Err(e),
+                };
+                Ok(lf.with_columns(pl_exprs_vec))
             },
             PipeConfig::GroupAndReduce(config) => {
                 let upstream_config = match self.pipe_configs.get(&config.pipe_id) {
