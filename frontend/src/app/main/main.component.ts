@@ -8,11 +8,12 @@ interface DataTypeArrays {
     i64: Map<string, Option<number>[]>,
     str: Map<string, Option<string>[]>,
     datetime: Map<string, Option<number>[]>,
+    bool: Map<string, Option<boolean[]>>,
 }
 
 function toDataTypeArrays(inputData: any[], columnSchema: {[k: string]: keyof DataTypeArrays}): DataTypeArrays {
     // TODO: Handle case when some records are missing keys...
-    const initialMap: DataTypeArrays = { f64: new Map(), i64: new Map(), str: new Map(), datetime: new Map() }
+    const initialMap: DataTypeArrays = { f64: new Map(), i64: new Map(), str: new Map(), datetime: new Map(), bool: new Map() }
     Object.entries(columnSchema).forEach(([k,v]) => {
         initialMap[v]!.set(k, [])
     })
@@ -115,9 +116,26 @@ export class MainComponent implements OnInit {
                                 }
                             ]
                         }
-                    }
+                    },
+                    {
+                        newProperty: 'wowzers',
+                        expression: {
+                            operation: 'IfThenElse',
+                            operands: [
+                                { operation: 'LessThan', operands: [{ property: 'hello' }, 80] },
+                                0,
+                                { operation: 'LessThan', operands: [{ property: 'hello' }, 90] },
+                                1000,
+                                2000,
+                            ]
+                        }
+                    },
+                    // {
+                    //     newProperty: 'x',
+                    //     expression: { operation: 'LessThan', operands: [{ property: 'hello' }, 80] },
+                    // }
                 ]
-            }
+            },
         }
         const inputData = {
              myFirstSource: toDataTypeArrays(

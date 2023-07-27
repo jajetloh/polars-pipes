@@ -1,7 +1,7 @@
 use wasm_bindgen::prelude::*;
 
 use std::{collections::HashMap, ops::Add};
-use polars::{prelude::{LazyFrame, col, lit, JoinBuilder, JoinType, DataType, DataFrame, Series, NamedFrom, IntoLazy}, lazy::dsl::Expr};
+use polars::{prelude::{LazyFrame, col, lit, JoinBuilder, JoinType, DataType, DataFrame, Series, NamedFrom, IntoLazy}, lazy::dsl::{Expr, when, WhenThen}};
 
 use serde::{Deserialize, Serialize};
 use serde_json::from_str;
@@ -79,6 +79,8 @@ pub struct DerivedValuesExpressionRoot {
 pub enum DerivedValuesOperationType {
     Sum,
     Subtract,
+    LessThan,
+    IfThenElse,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -86,6 +88,25 @@ pub struct DerivedValuesOperation {
     operation: DerivedValuesOperationType,
     operands: Vec<DerivedValuesExpression>,
 }
+
+// #[derive(Debug, Clone, Deserialize, Serialize)]
+// pub enum BooleanDerivedValuesOperationType {
+//     And,
+//     Or,
+//     // LessThan,
+//     // LessThanEqual,
+//     // GreaterThan,
+//     // GreaterThanEqual,
+//     // Equals,
+//     // Not,
+//     // NotEquals,
+// }
+
+// #[derive(Debug, Clone, Deserialize, Serialize)]
+// pub struct BooleanDerivedValuesOperation {
+//     operation: BooleanDerivedValuesOperationType,
+//     operands: Vec<DerivedValuesExpression>,
+// }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DerivedValuesProperty {
@@ -96,6 +117,7 @@ pub struct DerivedValuesProperty {
 #[serde(untagged)]
 pub enum DerivedValuesExpression {
     Expression(DerivedValuesOperation),
+    // BooleanExpression(BooleanDerivedValuesOperation),
     Variable(DerivedValuesProperty),
     Literal(f64),
 }
@@ -123,6 +145,28 @@ fn recurse_derived_expression(expression: DerivedValuesExpression) -> Result<Exp
                     });
                     return Ok(sub_expr)
                 },
+                DerivedValuesOperationType::LessThan => {
+                    match pl_exprs_vec.len() {
+                        2 => Ok(pl_exprs_vec[0].clone().lt(pl_exprs_vec[1].clone())),
+                        _ => return Err(format!("LessThan must have exactly 2 operands ({} found)", pl_exprs_vec.len()).into())
+                    }
+                },
+                DerivedValuesOperationType::IfThenElse => {
+                    if pl_exprs_vec.len() % 2 == 0 {
+                        return Err("Must have an odd number of operands".into());
+                    } else if pl_exprs_vec.len() < 3 {
+                        return Err("Not enough operands".into());
+                    }
+                    // Next line is a workaround to get an initial WhenThenThen struct
+                    let mut expr = when(lit(false)).then(lit(false)).when(lit(false)).then(lit(false));
+                    for i in 0..(pl_exprs_vec.len() / 2) {
+                        log(&format!("i={}, doing {} {}, total length {}", i, i, i+1, pl_exprs_vec.len()));
+                        expr = expr.when(pl_exprs_vec[2*i].clone()).then(pl_exprs_vec[2*i+1].clone());
+                    }
+                    let final_expr = expr.otherwise(pl_exprs_vec[pl_exprs_vec.len() - 1].clone());
+                    return Ok(final_expr)
+                },
+                
             }
         },
         DerivedValuesExpression::Literal(x) => Ok(lit(x)),
@@ -198,6 +242,7 @@ pub struct DataTable {
     i64: HashMap<String, Vec<Option<i64>>>,
     str: HashMap<String, Vec<Option<String>>>,
     datetime: HashMap<String, Vec<Option<i64>>>,
+    bool: HashMap<String, Vec<Option<bool>>>,
 }
 
 fn data_table_to_frame(table: &DataTable) -> LazyFrame {
@@ -223,6 +268,7 @@ fn data_frame_to_table(lf: LazyFrame) -> Result<DataTable, String> {
         i64: HashMap::new(),
         str: HashMap::new(),
         datetime: HashMap::new(),
+        bool: HashMap::new(),
     };
 
     let frame = match lf.collect() {
@@ -248,6 +294,10 @@ fn data_frame_to_table(lf: LazyFrame) -> Result<DataTable, String> {
                 let values = column.utf8().unwrap().into_iter().map(|x| match x { None => None, Some(y) => Some(y.to_string())}).collect();
                 data_table.str.insert(column.name().into(), values);
             },
+            DataType::Boolean => {
+                let values = column.bool().unwrap().into_iter().collect();
+                data_table.bool.insert(column.name().into(), values);
+            }
             // TODO: Handle dates...
             _ => return Err("!!".into()),
         }
@@ -347,7 +397,9 @@ impl LazyFrameFactory {
                     Ok(x) => x,
                     Err(e) => return Err(e),
                 };
-                Ok(lf.with_columns(pl_exprs_vec))
+                let final_lf = pl_exprs_vec.iter().fold(lf.clone(), |acc_lf, expr| acc_lf.with_column(expr.clone()) );
+                Ok(final_lf)
+                // Ok(lf.with_columns(pl_exprs_vec))
             },
             PipeConfig::GroupAndReduce(config) => {
                 let upstream_config = match self.pipe_configs.get(&config.pipe_id) {
