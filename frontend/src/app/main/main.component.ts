@@ -59,9 +59,9 @@ enum ColumnType {
 })
 export class MainComponent implements OnInit {
 
-    allNames = ['Alex', 'Beth', 'Carter', 'Diane', 'Eddy', 'Fiona', 'Gary', 'Hayley']
-    allSubjects = ['English', 'Maths', 'Sport', 'Politics', 'Drama', 'Music', 'Chemistry', 'Physics', 'Biology', 'Geography', 'Computer Science']
-    allSemesters = [1, 2, 3, 4, 5, 6, 7, 8]
+    allNames = ['Alex', 'Beth', 'Carter', 'Diane', 'Eddy', 'Fiona', 'Gary', 'Hayley', 'Ingrid', 'James', 'Karl', 'Leah', 'Mahwish', 'Niamh', 'Otto', 'Pyotr', 'Quill', 'Rue', 'Soleil', 'Tammy', 'Ulrich', 'Ville', 'Wahlberg', 'Xena', 'Yumi', 'Zet']
+    allSubjects = ['English', 'Maths', 'Sport', 'Politics', 'Drama', 'Music', 'Chemistry', 'Physics', 'Biology', 'Geography', 'Computer Science', 'Law', 'Ancient History', 'Modern History', 'Economics', 'Literature', 'Film', 'Media', 'Health Sciences', 'Medicine', 'Business', 'Management', 'Leadership']
+    allSemesters = Object.keys([...new Array(1000)]).map(x => Number(x))
     studentScores: any[] = []
     subjectMultipliers: any[] = []
     constructor() {
@@ -136,6 +136,20 @@ export class MainComponent implements OnInit {
                     // }
                 ]
             },
+            hoorayFiltered: {
+                type: 'Filter',
+                pipeId: 'adjustedScoresDerivedValues',
+                filters: [
+                    {
+                        operation: 'GreaterThan',
+                        operands: [{ property: 'semester' }, 900]
+                    },
+                    {
+                        operation: 'LessThan',
+                        operands: [{ property: 'semester' }, 910]
+                    }
+                ]
+            }
         }
         const inputData = {
              myFirstSource: toDataTypeArrays(
@@ -149,7 +163,7 @@ export class MainComponent implements OnInit {
             studentScores: toDataTypeArrays(this.studentScores, { name: 'str', subject: 'str', score: 'f64' }),
             subjectMultipliers: toDataTypeArrays(this.subjectMultipliers, { subject: 'str', semester: 'i64', multiplier: 'f64' }),
         }
-        const result = polarsPipes.run_data_pipeline(['adjustedScoresDerivedValues'], inputData, pipeConfigs)
+        const result = polarsPipes.run_data_pipeline(['hoorayFiltered'], inputData, pipeConfigs)
         // const result = polarsPipes.run_data_pipeline(['adjustedScores'], inputData, pipeConfigs)
         console.log('RESULT IS', fromDataTypeArrays(result))
     }

@@ -79,7 +79,17 @@ pub struct DerivedValuesExpressionRoot {
 pub enum DerivedValuesOperationType {
     Sum,
     Subtract,
+    Multiply,
+    Divide,
+    // Min,
+    // Max,
+    Not,
+    And,
+    Or,
     LessThan,
+    LessThanEq,
+    GreaterThan,
+    GreaterThanEq,
     IfThenElse,
 }
 
@@ -88,25 +98,6 @@ pub struct DerivedValuesOperation {
     operation: DerivedValuesOperationType,
     operands: Vec<DerivedValuesExpression>,
 }
-
-// #[derive(Debug, Clone, Deserialize, Serialize)]
-// pub enum BooleanDerivedValuesOperationType {
-//     And,
-//     Or,
-//     // LessThan,
-//     // LessThanEqual,
-//     // GreaterThan,
-//     // GreaterThanEqual,
-//     // Equals,
-//     // Not,
-//     // NotEquals,
-// }
-
-// #[derive(Debug, Clone, Deserialize, Serialize)]
-// pub struct BooleanDerivedValuesOperation {
-//     operation: BooleanDerivedValuesOperationType,
-//     operands: Vec<DerivedValuesExpression>,
-// }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DerivedValuesProperty {
@@ -117,7 +108,6 @@ pub struct DerivedValuesProperty {
 #[serde(untagged)]
 pub enum DerivedValuesExpression {
     Expression(DerivedValuesOperation),
-    // BooleanExpression(BooleanDerivedValuesOperation),
     Variable(DerivedValuesProperty),
     Literal(f64),
 }
@@ -145,10 +135,88 @@ fn recurse_derived_expression(expression: DerivedValuesExpression) -> Result<Exp
                     });
                     return Ok(sub_expr)
                 },
+                DerivedValuesOperationType::Multiply => {
+                    let sum_expr = pl_exprs_vec.iter().fold(lit(0), |acc: Expr, x: &Expr| {
+                        acc * x.clone()
+                    });
+                    return Ok(sum_expr)
+                },
+                DerivedValuesOperationType::Divide => {
+                    let sub_expr = pl_exprs_vec.iter().skip(1).fold(pl_exprs_vec[0].clone(), |acc: Expr, x: &Expr| {
+                        acc / x.clone()
+                    });
+                    return Ok(sub_expr)
+                },
+                // DerivedValuesOperationType::Min => {
+                //     let min_expr = match pl_exprs_vec.len() {
+                //         0 => { return Err("'Min' requires at least one operand.".into()) },
+                //         1 => min_horizontal([pl_exprs_vec[0]]),
+                //         2 => min_horizontal([pl_exprs_vec[0], pl_exprs_vec[1]]),
+                //         3 => min_horizontal([pl_exprs_vec[0], pl_exprs_vec[1], pl_exprs_vec[2]]),
+                //         4 => min_horizontal([pl_exprs_vec[0], pl_exprs_vec[1], pl_exprs_vec[2], pl_exprs_vec[3]]),
+                //         5 => min_horizontal([pl_exprs_vec[0], pl_exprs_vec[1], pl_exprs_vec[2], pl_exprs_vec[3], pl_exprs_vec[4]]),
+                //         6 => min_horizontal([pl_exprs_vec[0], pl_exprs_vec[1], pl_exprs_vec[2], pl_exprs_vec[3], pl_exprs_vec[4], pl_exprs_vec[5]]),
+                //         7 => min_horizontal([pl_exprs_vec[0], pl_exprs_vec[1], pl_exprs_vec[2], pl_exprs_vec[3], pl_exprs_vec[4], pl_exprs_vec[5], pl_exprs_vec[6]]),
+                //         8 => min_horizontal([pl_exprs_vec[0], pl_exprs_vec[1], pl_exprs_vec[2], pl_exprs_vec[3], pl_exprs_vec[4], pl_exprs_vec[5], pl_exprs_vec[6], pl_exprs_vec[7]]),
+                //         _ => { return Err("Too many operands to min by. Need to implement.".into()) },
+                //     };
+                //     Ok(min_expr)
+                // },
+                // DerivedValuesOperationType::Max => {
+                //     let max_expr = match pl_exprs_vec.len() {
+                //         0 => { return Err("'Max' requires at least one operand.".into()) },
+                //         1 => max_horizontal([pl_exprs_vec[0]]),
+                //         2 => max_horizontal([pl_exprs_vec[0], pl_exprs_vec[1]]),
+                //         3 => max_horizontal([pl_exprs_vec[0], pl_exprs_vec[1], pl_exprs_vec[2]]),
+                //         4 => max_horizontal([pl_exprs_vec[0], pl_exprs_vec[1], pl_exprs_vec[2], pl_exprs_vec[3]]),
+                //         5 => max_horizontal([pl_exprs_vec[0], pl_exprs_vec[1], pl_exprs_vec[2], pl_exprs_vec[3], pl_exprs_vec[4]]),
+                //         6 => max_horizontal([pl_exprs_vec[0], pl_exprs_vec[1], pl_exprs_vec[2], pl_exprs_vec[3], pl_exprs_vec[4], pl_exprs_vec[5]]),
+                //         7 => max_horizontal([pl_exprs_vec[0], pl_exprs_vec[1], pl_exprs_vec[2], pl_exprs_vec[3], pl_exprs_vec[4], pl_exprs_vec[5], pl_exprs_vec[6]]),
+                //         8 => max_horizontal([pl_exprs_vec[0], pl_exprs_vec[1], pl_exprs_vec[2], pl_exprs_vec[3], pl_exprs_vec[4], pl_exprs_vec[5], pl_exprs_vec[6], pl_exprs_vec[7]]),
+                //         _ => { return Err("Too many operands to min by. Need to implement.".into()) },
+                //     };
+                //     Ok(max_expr)
+                // },
+                DerivedValuesOperationType::Not => {
+                    match pl_exprs_vec.len() {
+                        1 => Ok(pl_exprs_vec[0].clone().not()),
+                        _ => return Err(format!("'Not' must have exactly 1 operand ({} found)", pl_exprs_vec.len()).into())
+                    }
+                },
+                DerivedValuesOperationType::And => {
+                    let expr = pl_exprs_vec.iter().fold(lit(0), |acc: Expr, x: &Expr| {
+                        acc.and(x.clone())
+                    });
+                    return Ok(expr)
+                },
+                DerivedValuesOperationType::Or => {
+                    let expr = pl_exprs_vec.iter().fold(lit(0), |acc: Expr, x: &Expr| {
+                        acc.or(x.clone())
+                    });
+                    return Ok(expr)
+                },
                 DerivedValuesOperationType::LessThan => {
                     match pl_exprs_vec.len() {
                         2 => Ok(pl_exprs_vec[0].clone().lt(pl_exprs_vec[1].clone())),
-                        _ => return Err(format!("LessThan must have exactly 2 operands ({} found)", pl_exprs_vec.len()).into())
+                        _ => return Err(format!("'LessThan' must have exactly 2 operands ({} found)", pl_exprs_vec.len()).into())
+                    }
+                },
+                DerivedValuesOperationType::LessThanEq => {
+                    match pl_exprs_vec.len() {
+                        2 => Ok(pl_exprs_vec[0].clone().lt_eq(pl_exprs_vec[1].clone())),
+                        _ => return Err(format!("'LessThanEq' must have exactly 2 operands ({} found)", pl_exprs_vec.len()).into())
+                    }
+                },
+                DerivedValuesOperationType::GreaterThan => {
+                    match pl_exprs_vec.len() {
+                        2 => Ok(pl_exprs_vec[0].clone().gt(pl_exprs_vec[1].clone())),
+                        _ => return Err(format!("'GreaterThan' must have exactly 2 operands ({} found)", pl_exprs_vec.len()).into())
+                    }
+                },
+                DerivedValuesOperationType::GreaterThanEq => {
+                    match pl_exprs_vec.len() {
+                        2 => Ok(pl_exprs_vec[0].clone().gt_eq(pl_exprs_vec[1].clone())),
+                        _ => return Err(format!("'GreaterThanEq' must have exactly 2 operands ({} found)", pl_exprs_vec.len()).into())
                     }
                 },
                 DerivedValuesOperationType::IfThenElse => {
@@ -166,7 +234,6 @@ fn recurse_derived_expression(expression: DerivedValuesExpression) -> Result<Exp
                     let final_expr = expr.otherwise(pl_exprs_vec[pl_exprs_vec.len() - 1].clone());
                     return Ok(final_expr)
                 },
-                
             }
         },
         DerivedValuesExpression::Literal(x) => Ok(lit(x)),
@@ -197,6 +264,14 @@ pub struct AggConfig {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct FilterPipeConfig {
+    pipe_id: String,
+    filters: Vec<DerivedValuesExpression>
+}
+
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct JoinPipeConfig {
     left_pipe_id: String,
     right_pipe_id: String,
@@ -219,17 +294,18 @@ pub enum PipeConfig {
     BinaryCalculation(BinaryCalculationPipeConfig),
     DerivedValues(DerivedValuesPipeConfig),
     GroupAndReduce(GroupAndReducePipeConfig),
+    Filter(FilterPipeConfig),
     Join(JoinPipeConfig),
     // StringToDate(StringToDatePipeConfig),
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub enum PipeConfigType {
-    SourceCsv,
-    BinaryCalculation,
-    Join,
-    // StringToDate,
-}
+// #[derive(Debug, Clone, Deserialize, Serialize)]
+// pub enum PipeConfigType {
+//     SourceCsv,
+//     BinaryCalculation,
+//     Join,
+//     // StringToDate,
+// }
 
 pub struct LazyFrameFactory {
     lazy_frames: HashMap<String, LazyFrame>,
@@ -278,7 +354,7 @@ fn data_frame_to_table(lf: LazyFrame) -> Result<DataTable, String> {
     let schema = frame.schema();
     let mut schema_dtype_iter = schema.iter_dtypes();
     let mut column_iters = frame.iter();
-    for i in 0..frame.width() {
+    for _ in 0..frame.width() {
         let dtype = schema_dtype_iter.next().unwrap();
         let column = column_iters.next().unwrap();
         match dtype {
@@ -399,7 +475,6 @@ impl LazyFrameFactory {
                 };
                 let final_lf = pl_exprs_vec.iter().fold(lf.clone(), |acc_lf, expr| acc_lf.with_column(expr.clone()) );
                 Ok(final_lf)
-                // Ok(lf.with_columns(pl_exprs_vec))
             },
             PipeConfig::GroupAndReduce(config) => {
                 let upstream_config = match self.pipe_configs.get(&config.pipe_id) {
@@ -430,6 +505,27 @@ impl LazyFrameFactory {
                     }).collect::<Vec<_>>()
                 );
                 Ok(lf_out)
+            },
+            PipeConfig::Filter(config) => {
+                let upstream_config = match self.pipe_configs.get(&config.pipe_id) {
+                    Some(c) => c.clone(),
+                    None => { println!("Pipe id {} not found", config.pipe_id); return Err(format!("Pipe id {} not found", config.pipe_id)) },
+                };
+                let lf = match self.recurse(&upstream_config) {
+                    Ok(lf) => lf,
+                    Err(e) => return Err(e),
+                };
+                let pl_exprs_vec: Vec<Expr> = match config.filters.iter().map(|calc| {
+                    match recurse_derived_expression(calc.clone()) {
+                        Ok(y) => Ok(y),
+                        Err(e) => Err(e),
+                    }
+                }).collect::<Result<Vec<Expr>, String>>() {
+                    Ok(x) => x,
+                    Err(e) => return Err(e),
+                };
+                let final_lf = pl_exprs_vec.iter().fold(lf.clone(), |acc_lf, expr| acc_lf.filter(expr.clone()) );
+                Ok(final_lf)
             },
             PipeConfig::Join(config) => {
                 let left_config = match self.pipe_configs.get(&config.left_pipe_id) {
