@@ -130,10 +130,10 @@ export class MainComponent implements OnInit {
                             ]
                         }
                     },
-                    // {
-                    //     newProperty: 'x',
-                    //     expression: { operation: 'LessThan', operands: [{ property: 'hello' }, 80] },
-                    // }
+                    {
+                        newProperty: 'boundedScore',
+                        expression: { operation: 'Min', operands: [{ property: 'adjustedScore' }, 200] },
+                    }
                 ]
             },
             hoorayFiltered: {

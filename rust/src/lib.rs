@@ -1,7 +1,7 @@
 use wasm_bindgen::prelude::*;
 
 use std::{collections::HashMap, ops::Add};
-use polars::{prelude::{LazyFrame, col, lit, JoinBuilder, JoinType, DataType, DataFrame, Series, NamedFrom, IntoLazy}, lazy::dsl::{Expr, when, WhenThen}};
+use polars::{prelude::{LazyFrame, col, lit, JoinBuilder, JoinType, DataType, DataFrame, Series, NamedFrom, IntoLazy, min_horizontal, max_horizontal}, lazy::dsl::{Expr, when}};
 
 use serde::{Deserialize, Serialize};
 use serde_json::from_str;
@@ -81,8 +81,8 @@ pub enum DerivedValuesOperationType {
     Subtract,
     Multiply,
     Divide,
-    // Min,
-    // Max,
+    Min,
+    Max,
     Not,
     And,
     Or,
@@ -147,36 +147,36 @@ fn recurse_derived_expression(expression: DerivedValuesExpression) -> Result<Exp
                     });
                     return Ok(sub_expr)
                 },
-                // DerivedValuesOperationType::Min => {
-                //     let min_expr = match pl_exprs_vec.len() {
-                //         0 => { return Err("'Min' requires at least one operand.".into()) },
-                //         1 => min_horizontal([pl_exprs_vec[0]]),
-                //         2 => min_horizontal([pl_exprs_vec[0], pl_exprs_vec[1]]),
-                //         3 => min_horizontal([pl_exprs_vec[0], pl_exprs_vec[1], pl_exprs_vec[2]]),
-                //         4 => min_horizontal([pl_exprs_vec[0], pl_exprs_vec[1], pl_exprs_vec[2], pl_exprs_vec[3]]),
-                //         5 => min_horizontal([pl_exprs_vec[0], pl_exprs_vec[1], pl_exprs_vec[2], pl_exprs_vec[3], pl_exprs_vec[4]]),
-                //         6 => min_horizontal([pl_exprs_vec[0], pl_exprs_vec[1], pl_exprs_vec[2], pl_exprs_vec[3], pl_exprs_vec[4], pl_exprs_vec[5]]),
-                //         7 => min_horizontal([pl_exprs_vec[0], pl_exprs_vec[1], pl_exprs_vec[2], pl_exprs_vec[3], pl_exprs_vec[4], pl_exprs_vec[5], pl_exprs_vec[6]]),
-                //         8 => min_horizontal([pl_exprs_vec[0], pl_exprs_vec[1], pl_exprs_vec[2], pl_exprs_vec[3], pl_exprs_vec[4], pl_exprs_vec[5], pl_exprs_vec[6], pl_exprs_vec[7]]),
-                //         _ => { return Err("Too many operands to min by. Need to implement.".into()) },
-                //     };
-                //     Ok(min_expr)
-                // },
-                // DerivedValuesOperationType::Max => {
-                //     let max_expr = match pl_exprs_vec.len() {
-                //         0 => { return Err("'Max' requires at least one operand.".into()) },
-                //         1 => max_horizontal([pl_exprs_vec[0]]),
-                //         2 => max_horizontal([pl_exprs_vec[0], pl_exprs_vec[1]]),
-                //         3 => max_horizontal([pl_exprs_vec[0], pl_exprs_vec[1], pl_exprs_vec[2]]),
-                //         4 => max_horizontal([pl_exprs_vec[0], pl_exprs_vec[1], pl_exprs_vec[2], pl_exprs_vec[3]]),
-                //         5 => max_horizontal([pl_exprs_vec[0], pl_exprs_vec[1], pl_exprs_vec[2], pl_exprs_vec[3], pl_exprs_vec[4]]),
-                //         6 => max_horizontal([pl_exprs_vec[0], pl_exprs_vec[1], pl_exprs_vec[2], pl_exprs_vec[3], pl_exprs_vec[4], pl_exprs_vec[5]]),
-                //         7 => max_horizontal([pl_exprs_vec[0], pl_exprs_vec[1], pl_exprs_vec[2], pl_exprs_vec[3], pl_exprs_vec[4], pl_exprs_vec[5], pl_exprs_vec[6]]),
-                //         8 => max_horizontal([pl_exprs_vec[0], pl_exprs_vec[1], pl_exprs_vec[2], pl_exprs_vec[3], pl_exprs_vec[4], pl_exprs_vec[5], pl_exprs_vec[6], pl_exprs_vec[7]]),
-                //         _ => { return Err("Too many operands to min by. Need to implement.".into()) },
-                //     };
-                //     Ok(max_expr)
-                // },
+                DerivedValuesOperationType::Min => {
+                    let min_expr = match pl_exprs_vec.len() {
+                        0 => { return Err("'Min' requires at least one operand.".into()) },
+                        1 => min_horizontal([pl_exprs_vec[0].clone()]),
+                        2 => min_horizontal([pl_exprs_vec[0].clone(), pl_exprs_vec[1].clone()]),
+                        3 => min_horizontal([pl_exprs_vec[0].clone(), pl_exprs_vec[1].clone(), pl_exprs_vec[2].clone()]),
+                        4 => min_horizontal([pl_exprs_vec[0].clone(), pl_exprs_vec[1].clone(), pl_exprs_vec[2].clone(), pl_exprs_vec[3].clone()]),
+                        5 => min_horizontal([pl_exprs_vec[0].clone(), pl_exprs_vec[1].clone(), pl_exprs_vec[2].clone(), pl_exprs_vec[3].clone(), pl_exprs_vec[4].clone()]),
+                        6 => min_horizontal([pl_exprs_vec[0].clone(), pl_exprs_vec[1].clone(), pl_exprs_vec[2].clone(), pl_exprs_vec[3].clone(), pl_exprs_vec[4].clone(), pl_exprs_vec[5].clone()]),
+                        7 => min_horizontal([pl_exprs_vec[0].clone(), pl_exprs_vec[1].clone(), pl_exprs_vec[2].clone(), pl_exprs_vec[3].clone(), pl_exprs_vec[4].clone(), pl_exprs_vec[5].clone(), pl_exprs_vec[6].clone()]),
+                        8 => min_horizontal([pl_exprs_vec[0].clone(), pl_exprs_vec[1].clone(), pl_exprs_vec[2].clone(), pl_exprs_vec[3].clone(), pl_exprs_vec[4].clone(), pl_exprs_vec[5].clone(), pl_exprs_vec[6].clone(), pl_exprs_vec[7].clone()]),
+                        _ => { return Err("Too many operands to min by. Need to implement.".into()) },
+                    };
+                    Ok(min_expr)
+                },
+                DerivedValuesOperationType::Max => {
+                    let max_expr = match pl_exprs_vec.len() {
+                        0 => { return Err("'Max' requires at least one operand.".into()) },
+                        1 => max_horizontal([pl_exprs_vec[0].clone()]),
+                        2 => max_horizontal([pl_exprs_vec[0].clone(), pl_exprs_vec[1].clone()]),
+                        3 => max_horizontal([pl_exprs_vec[0].clone(), pl_exprs_vec[1].clone(), pl_exprs_vec[2].clone()]),
+                        4 => max_horizontal([pl_exprs_vec[0].clone(), pl_exprs_vec[1].clone(), pl_exprs_vec[2].clone(), pl_exprs_vec[3].clone()]),
+                        5 => max_horizontal([pl_exprs_vec[0].clone(), pl_exprs_vec[1].clone(), pl_exprs_vec[2].clone(), pl_exprs_vec[3].clone(), pl_exprs_vec[4].clone()]),
+                        6 => max_horizontal([pl_exprs_vec[0].clone(), pl_exprs_vec[1].clone(), pl_exprs_vec[2].clone(), pl_exprs_vec[3].clone(), pl_exprs_vec[4].clone(), pl_exprs_vec[5].clone()]),
+                        7 => max_horizontal([pl_exprs_vec[0].clone(), pl_exprs_vec[1].clone(), pl_exprs_vec[2].clone(), pl_exprs_vec[3].clone(), pl_exprs_vec[4].clone(), pl_exprs_vec[5].clone(), pl_exprs_vec[6].clone()]),
+                        8 => max_horizontal([pl_exprs_vec[0].clone(), pl_exprs_vec[1].clone(), pl_exprs_vec[2].clone(), pl_exprs_vec[3].clone(), pl_exprs_vec[4].clone(), pl_exprs_vec[5].clone(), pl_exprs_vec[6].clone(), pl_exprs_vec[7].clone()]),
+                        _ => { return Err("Too many operands to min by. Need to implement.".into()) },
+                    };
+                    Ok(max_expr)
+                },
                 DerivedValuesOperationType::Not => {
                     match pl_exprs_vec.len() {
                         1 => Ok(pl_exprs_vec[0].clone().not()),
