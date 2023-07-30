@@ -253,6 +253,19 @@ pub enum JoinPipeType {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct RenamePipeConfig {
+    pipe_id: String,
+    properties: Vec<RenamePropertyConfig>
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RenamePropertyConfig {
+    from: String,
+    to: String
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StringToDatePipeConfig {
     pipe_id: String,
     column_from: String,
@@ -268,6 +281,7 @@ pub enum PipeConfig {
     GroupAndReduce(GroupAndReducePipeConfig),
     Filter(FilterPipeConfig),
     Join(JoinPipeConfig),
+    Rename(RenamePipeConfig),
     // StringToDate(StringToDatePipeConfig),
 }
 
@@ -497,7 +511,12 @@ impl LazyFrameFactory {
                     Ok(lf) => lf,
                     Err(e) => return Err(e),
                 };
-                let jb = JoinBuilder::new(left_lf).with(right_lf).how(JoinType::Left);
+                let jb: JoinBuilder = match config.how {
+                    JoinPipeType::Left => JoinBuilder::new(left_lf).with(right_lf).how(JoinType::Left),
+                    JoinPipeType::Right => JoinBuilder::new(right_lf).with(left_lf).how(JoinType::Left),
+                    JoinPipeType::Inner => JoinBuilder::new(left_lf).with(right_lf).how(JoinType::Inner),
+                    JoinPipeType::Outer => JoinBuilder::new(left_lf).with(right_lf).how(JoinType::Outer),
+                };
                 let jb_join = match config.on.len() {
                     1 => jb.on(&[col(&config.on[0])]),
                     2 => jb.on(&[col(&config.on[0]), col(&config.on[1])]),
@@ -510,6 +529,17 @@ impl LazyFrameFactory {
                     _ => return Err(format!("Too many arguments to join on in pipe_id {:?}", config)),
                 };
                 Ok(jb_join.finish())
+            },
+            PipeConfig::Rename(config) => {
+                let upstream_config = match self.pipe_configs.get(&config.pipe_id) {
+                    Some(c) => c.clone(),
+                    None => { println!("Pipe id {} not found", config.pipe_id); return Err(format!("Pipe id {} not found", config.pipe_id)) },
+                };
+                let lf = match self.recurse(&upstream_config) {
+                    Ok(lf) => lf,
+                    Err(e) => return Err(e),
+                };
+                Ok(lf.rename(config.properties.iter().map(|x| x.from.clone()), config.properties.iter().map(|x| x.to.clone())))
             },
             // PipeConfigType::StringToDate => {
             //     let config = from_str::<StringToDatePipeConfig>(&config_str).unwrap();
