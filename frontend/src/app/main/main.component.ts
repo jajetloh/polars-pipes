@@ -84,11 +84,12 @@ export class MainComponent implements OnInit {
         const pipeConfigs = {
             source1: { type: 'SourceCsv', path: '.', sourceId: 'myFirstSource' },
             source2: { type: 'SourceCsv', path: '.', sourceId: 'mySecondSource' },
-            join1: { type: 'Join', leftPipeId: 'source1', rightPipeId: 'source2', on: ['name'] },
+            join1: { type: 'Join', leftPipeId: 'source1', rightPipeId: 'source2', on: ['name'], how: 'Left' },
             studentScoresSource: { type: 'SourceCsv', path: '', sourceId: 'studentScores' },
             subjectMultipliersSource: { type: 'SourceCsv', path: '', sourceId: 'subjectMultipliers' },
-            scoresJoinMultipliers: { type: 'Join', leftPipeId: 'studentScoresSource', rightPipeId: 'subjectMultipliersSource', on: ['subject'] },
-            adjustedScores: { type: 'BinaryCalculation', pipeId: 'scoresJoinMultipliers', newColumn: 'adjustedScore', column1: 'score', column2: 'multiplier' },
+            scoresJoinMultipliers: { type: 'Join', leftPipeId: 'studentScoresSource', rightPipeId: 'subjectMultipliersSource', on: ['subject'], how: 'Left' },
+            adjustedScores: { type: 'DerivedValues', pipeId: 'scoresJoinMultipliers', calcs: [{ newProperty: 'adjustedScore', expression: { operation: 'Sum', operands: [{ property: 'score' }, { property: 'multiplier' }]} }]},
+            // adjustedScores: { type: 'BinaryCalculation', pipeId: 'scoresJoinMultipliers', newColumn: 'adjustedScore', column1: 'score', column2: 'multiplier' },
             adjustedScoresSum: {
                 type: 'GroupAndReduce',
                 pipeId: 'adjustedScores',
@@ -164,6 +165,7 @@ export class MainComponent implements OnInit {
             subjectMultipliers: toDataTypeArrays(this.subjectMultipliers, { subject: 'str', semester: 'i64', multiplier: 'f64' }),
         }
         const result = polarsPipes.run_data_pipeline(['hoorayFiltered'], inputData, pipeConfigs)
+        // const result = polarsPipes.run_data_pipeline(['adjustedScoresDerivedValues'], inputData, pipeConfigs)
         // const result = polarsPipes.run_data_pipeline(['adjustedScores'], inputData, pipeConfigs)
         console.log('RESULT IS', fromDataTypeArrays(result))
     }

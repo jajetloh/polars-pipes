@@ -1,29 +1,12 @@
 use wasm_bindgen::prelude::*;
 
-use std::{collections::HashMap, ops::Add};
+use std::collections::HashMap;
 use polars::{prelude::{LazyFrame, col, lit, JoinBuilder, JoinType, DataType, DataFrame, Series, NamedFrom, IntoLazy, min_horizontal, max_horizontal}, lazy::dsl::{Expr, when}};
 
 use serde::{Deserialize, Serialize};
-use serde_json::from_str;
-use chrono::{NaiveDate, NaiveDateTime};
 
 extern crate console_error_panic_hook;
 use std::panic;
-
-// pub fn add(left: usize, right: usize) -> usize {
-//     left + right
-// }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-
-//     #[test]
-//     fn it_works() {
-//         let result = add(2, 2);
-//         assert_eq!(result, 4);
-//     }
-// }
 
 #[wasm_bindgen]
 extern "C" {
@@ -32,16 +15,6 @@ extern "C" {
     // `log(..)`
     #[wasm_bindgen(js_namespace = console)]
     fn log(s: &str);
-
-    // The `console.log` is quite polymorphic, so we can bind it with multiple
-    // signatures. Note that we need to use `js_name` to ensure we always call
-    // `log` in JS.
-    #[wasm_bindgen(js_namespace = console, js_name = log)]
-    fn log_u64(a: u64);
-
-    // Multiple arguments too!
-    #[wasm_bindgen(js_namespace = console, js_name = log)]
-    fn log_many(a: &str, b: &str);
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -49,15 +22,6 @@ extern "C" {
 pub struct SourceCsvPipeConfig {
     path: String,
     source_id: String,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BinaryCalculationPipeConfig {
-    pipe_id: String,
-    new_column: String,
-    column_1: String,
-    column_2: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -276,6 +240,15 @@ pub struct JoinPipeConfig {
     left_pipe_id: String,
     right_pipe_id: String,
     on: Vec<String>,
+    how: JoinPipeType,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub enum JoinPipeType {
+    Left,
+    Right,
+    Inner,
+    Outer,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -291,21 +264,12 @@ pub struct StringToDatePipeConfig {
 #[serde(tag="type")]
 pub enum PipeConfig {
     SourceCsv(SourceCsvPipeConfig),
-    BinaryCalculation(BinaryCalculationPipeConfig),
     DerivedValues(DerivedValuesPipeConfig),
     GroupAndReduce(GroupAndReducePipeConfig),
     Filter(FilterPipeConfig),
     Join(JoinPipeConfig),
     // StringToDate(StringToDatePipeConfig),
 }
-
-// #[derive(Debug, Clone, Deserialize, Serialize)]
-// pub enum PipeConfigType {
-//     SourceCsv,
-//     BinaryCalculation,
-//     Join,
-//     // StringToDate,
-// }
 
 pub struct LazyFrameFactory {
     lazy_frames: HashMap<String, LazyFrame>,
@@ -443,17 +407,6 @@ impl LazyFrameFactory {
                 }.clone();
                 log("SourceCsv data_lf successful");
                 Ok(data_lf)
-            },
-            PipeConfig::BinaryCalculation(config) => {
-                let upstream_config = match self.pipe_configs.get(&config.pipe_id) {
-                    Some(c) => c.clone(),
-                    None => { println!("Pipe id {} not found", config.pipe_id); return Err(format!("Pipe id {} not found", config.pipe_id)) },
-                };
-                let lf = match self.recurse(&upstream_config) {
-                    Ok(lf) => lf,
-                    Err(e) => return Err(e),
-                };
-                Ok(lf.with_column((col(&config.column_1) + col(&config.column_2)).alias(&config.new_column)))
             },
             PipeConfig::DerivedValues(config) => {
                 let upstream_config = match self.pipe_configs.get(&config.pipe_id) {
