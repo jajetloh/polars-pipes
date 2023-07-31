@@ -1,9 +1,10 @@
 use wasm_bindgen::prelude::*;
 
 use std::collections::HashMap;
-use polars::{prelude::{LazyFrame, col, lit, JoinBuilder, JoinType, DataType, DataFrame, Series, NamedFrom, IntoLazy, min_horizontal, max_horizontal}, lazy::dsl::{Expr, when}};
+use polars::{prelude::{LazyFrame, col, lit, JoinBuilder, JoinType, DataType, DataFrame, Series, NamedFrom, IntoLazy, min_horizontal, max_horizontal, TimeUnit}, lazy::dsl::{Expr, when}};
 
 use serde::{Deserialize, Serialize};
+use chrono::Utc;
 
 extern crate console_error_panic_hook;
 use std::panic;
@@ -351,8 +352,16 @@ fn data_frame_to_table(lf: LazyFrame) -> Result<DataTable, String> {
             DataType::Boolean => {
                 let values = column.bool().unwrap().into_iter().collect();
                 data_table.bool.insert(column.name().into(), values);
-            }
-            // TODO: Handle dates...
+            },
+            DataType::Datetime(unit, tz) => {
+                todo!();
+                // let values: Vec<_> = match unit {
+                //     TimeUnit::Milliseconds => column.datetime().unwrap().into_iter().collect(),
+                //     TimeUnit::Microseconds => column.datetime().unwrap().into_iter().collect(),
+                //     TimeUnit::Nanoseconds => column.datetime().unwrap().into_iter().collect(),
+                // };
+                // data_table.datetime.insert(column.name().into(), values);
+            },
             _ => return Err("!!".into()),
         }
     };
