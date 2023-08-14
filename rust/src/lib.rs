@@ -20,8 +20,7 @@ extern "C" {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SourceCsvPipeConfig {
-    path: String,
+pub struct SourcePipeConfig {
     source_id: String,
 }
 
@@ -36,7 +35,7 @@ pub struct DerivedValuesPipeConfig {
 #[serde(rename_all = "camelCase")]
 
 pub struct DerivedValuesExpressionRoot {
-    new_property: String,
+    name: String,
     expression: DerivedValuesExpression,
 }
 
@@ -221,10 +220,11 @@ enum AggType {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AggConfig {
     name: String,
     r#type: AggType,
-    value: String,
+    agg_property: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -277,7 +277,7 @@ pub struct StringToDatePipeConfig {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag="type")]
 pub enum PipeConfig {
-    SourceCsv(SourceCsvPipeConfig),
+    Source(SourcePipeConfig),
     DerivedValues(DerivedValuesPipeConfig),
     GroupAndReduce(GroupAndReducePipeConfig),
     Filter(FilterPipeConfig),
@@ -369,7 +369,7 @@ fn data_frame_to_table(lf: LazyFrame) -> Result<DataTable, String> {
 }
 
 #[wasm_bindgen]
-pub fn run_data_pipeline(pipe_ids: JsValue, input_data: JsValue, configs: JsValue) -> Result<JsValue, JsValue> {
+pub fn runDataPipeline(pipe_ids: JsValue, input_data: JsValue, configs: JsValue) -> Result<JsValue, JsValue> {
     panic::set_hook(Box::new(console_error_panic_hook::hook));
 
     log("start run_data_pipeline");
@@ -417,7 +417,7 @@ impl LazyFrameFactory {
     fn recurse(self: &Self, c: &PipeConfig) -> Result<LazyFrame, String> {
         log("Start recurse");
         match c {
-            PipeConfig::SourceCsv(config) => {
+            PipeConfig::Source(config) => {
                 log("Matched to SourceCSV");
                 log(&format!("Config is {:?}", config));
                 let data_lf = match self.lazy_frames.get(&config.source_id) {
@@ -442,7 +442,7 @@ impl LazyFrameFactory {
                 };
                 let pl_exprs_vec: Vec<Expr> = match config.calcs.iter().map(|calc| {
                     match recurse_derived_expression(calc.expression.clone()) {
-                        Ok(y) => Ok(y.alias(&calc.new_property)),
+                        Ok(y) => Ok(y.alias(&calc.name)),
                         Err(e) => Err(e),
                     }
                 }).collect::<Result<Vec<Expr>, String>>() {
@@ -475,7 +475,7 @@ impl LazyFrameFactory {
                     config.clone().aggs.into_iter().map(|c| {
                         match c.r#type {
                             AggType::Sum => {
-                                col(&c.value).sum().alias(&c.name)
+                                col(&c.agg_property).sum().alias(&c.name)
                             },
                         }
                     }).collect::<Vec<_>>()

@@ -1,19 +1,9 @@
 import { Component, OnInit } from '@angular/core'
-import * as polarsPipes from 'polars-pipes'
+import { DataTable, PipeConfig, runDataPipeline } from 'polars-pipes'
 
-type Option<T> = (T | undefined)
-
-interface DataTypeArrays {
-    f64: Map<string, Option<number>[]>,
-    i64: Map<string, Option<number>[]>,
-    str: Map<string, Option<string>[]>,
-    datetime: Map<string, Option<number>[]>,
-    bool: Map<string, Option<boolean[]>>,
-}
-
-function toDataTypeArrays(inputData: any[], columnSchema: {[k: string]: keyof DataTypeArrays}): DataTypeArrays {
+function toDataTypeArrays(inputData: any[], columnSchema: {[k: string]: keyof DataTable}): DataTable {
     // TODO: Handle case when some records are missing keys...
-    const initialMap: DataTypeArrays = { f64: new Map(), i64: new Map(), str: new Map(), datetime: new Map(), bool: new Map() }
+    const initialMap: DataTable = { f64: new Map(), i64: new Map(), str: new Map(), datetime: new Map(), bool: new Map() }
     Object.entries(columnSchema).forEach(([k,v]) => {
         initialMap[v]!.set(k, [])
     })
@@ -24,7 +14,7 @@ function toDataTypeArrays(inputData: any[], columnSchema: {[k: string]: keyof Da
         return acc
     }, initialMap)
 }
-function fromDataTypeArrays(input: DataTypeArrays): any[] {
+function fromDataTypeArrays(input: DataTable): any[] {
     const columnIters: { name: string, iterRef: any[] }[] = []
     let maxRows = 0
     Object.entries(input)
@@ -81,21 +71,21 @@ export class MainComponent implements OnInit {
     }
 
     onClick() {
-        const pipeConfigs = {
-            source1: { type: 'SourceCsv', path: '.', sourceId: 'myFirstSource' },
-            source2: { type: 'SourceCsv', path: '.', sourceId: 'mySecondSource' },
+        const pipeConfigs: { [k: string]: PipeConfig } = {
+            source1: { type: 'Source', sourceId: 'myFirstSource' },
+            source2: { type: 'Source', sourceId: 'mySecondSource' },
             join1: { type: 'Join', leftPipeId: 'source1', rightPipeId: 'source2', on: ['name'], how: 'Left' },
-            studentScoresSource: { type: 'SourceCsv', path: '', sourceId: 'studentScores' },
-            subjectMultipliersSource: { type: 'SourceCsv', path: '', sourceId: 'subjectMultipliers' },
+            studentScoresSource: { type: 'Source',  sourceId: 'studentScores' },
+            subjectMultipliersSource: { type: 'Source', sourceId: 'subjectMultipliers' },
             scoresJoinMultipliers: { type: 'Join', leftPipeId: 'studentScoresSource', rightPipeId: 'subjectMultipliersSource', on: ['subject'], how: 'Left' },
-            adjustedScores: { type: 'DerivedValues', pipeId: 'scoresJoinMultipliers', calcs: [{ newProperty: 'adjustedScore', expression: { operation: 'Sum', operands: [{ property: 'score' }, { property: 'multiplier' }]} }]},
+            adjustedScores: { type: 'DerivedValues', pipeId: 'scoresJoinMultipliers', calcs: [{ name: 'adjustedScore', expression: { operation: 'Sum', operands: [{ property: 'score' }, { property: 'multiplier' }]} }]},
             // adjustedScores: { type: 'BinaryCalculation', pipeId: 'scoresJoinMultipliers', newColumn: 'adjustedScore', column1: 'score', column2: 'multiplier' },
             adjustedScoresSum: {
                 type: 'GroupAndReduce',
                 pipeId: 'adjustedScores',
                 groupBy: ['name', 'subject'],
                 aggs: [
-                    { name: 'total', type: 'Sum', value: 'adjustedScore' }
+                    { name: 'total', type: 'Sum', aggProperty: 'adjustedScore' }
                 ]
             },
             adjustedScoresDerivedValues: {
@@ -103,7 +93,7 @@ export class MainComponent implements OnInit {
                 pipeId: 'adjustedScores',
                 calcs: [
                     {
-                        newProperty: 'hello',
+                        name: 'hello',
                         expression: {
                             operation: 'Subtract',
                             operands: [
@@ -119,7 +109,7 @@ export class MainComponent implements OnInit {
                         }
                     },
                     {
-                        newProperty: 'wowzers',
+                        name: 'wowzers',
                         expression: {
                             operation: 'IfThenElse',
                             operands: [
@@ -132,7 +122,7 @@ export class MainComponent implements OnInit {
                         }
                     },
                     {
-                        newProperty: 'boundedScore',
+                        name: 'boundedScore',
                         expression: { operation: 'Min', operands: [{ property: 'adjustedScore' }, 200] },
                     }
                 ]
@@ -152,7 +142,7 @@ export class MainComponent implements OnInit {
                 ]
             }
         }
-        const inputData = {
+        const inputData: {[k: string]: DataTable} = {
              myFirstSource: toDataTypeArrays(
                  [{ name: 'Andrew', score: 1.23 }, { name: 'Beth', score: undefined }, { name: 'Connor', score: 2.34 }],
                  { name: 'str', score: 'f64' },
@@ -164,7 +154,7 @@ export class MainComponent implements OnInit {
             studentScores: toDataTypeArrays(this.studentScores, { name: 'str', subject: 'str', score: 'f64' }),
             subjectMultipliers: toDataTypeArrays(this.subjectMultipliers, { subject: 'str', semester: 'i64', multiplier: 'f64' }),
         }
-        const result = polarsPipes.run_data_pipeline(['hoorayFiltered'], inputData, pipeConfigs)
+        const result = runDataPipeline(['hoorayFiltered'], inputData, pipeConfigs)
         // const result = polarsPipes.run_data_pipeline(['adjustedScoresDerivedValues'], inputData, pipeConfigs)
         // const result = polarsPipes.run_data_pipeline(['adjustedScores'], inputData, pipeConfigs)
         console.log('RESULT IS', fromDataTypeArrays(result))
