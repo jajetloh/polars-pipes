@@ -72,8 +72,16 @@ pub struct DerivedValuesProperty {
 #[serde(untagged)]
 pub enum DerivedValuesExpression {
     Expression(DerivedValuesOperation),
+    WindowAggExpression(DerivedValuesWindowAggExpression),
     Variable(DerivedValuesProperty),
     Literal(f64),
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DerivedValuesWindowAggExpression {
+    operation: AggType,
+    operand: Box<DerivedValuesExpression>,
+    over: Vec<String>,
 }
 
 fn recurse_derived_expression(expression: DerivedValuesExpression) -> Result<Expr, String> {
@@ -200,6 +208,30 @@ fn recurse_derived_expression(expression: DerivedValuesExpression) -> Result<Exp
                 },
             }
         },
+        DerivedValuesExpression::WindowAggExpression(expr) => {
+            let operand_expr = match recurse_derived_expression(*expr.operand.clone()) {
+                Ok(x) => x,
+                Err(e) => return Err(e)
+            };
+            if expr.over.len() > 1 {
+                return Err("Window expression over more than one variable not supported yet".into())
+            }
+            let over_as_boxed_slice = expr.over.iter().map(|x| lit(x.clone())).collect::<Vec<_>>().into_boxed_slice();
+            match expr.operation {
+                AggType::Sum => {
+                    let new_expr = operand_expr.sum().over(over_as_boxed_slice);
+                    return Ok(new_expr)
+                },
+                AggType::Max => {
+                    let new_expr = operand_expr.max().over(over_as_boxed_slice);
+                    return Ok(new_expr)
+                },
+                AggType::Min => {
+                    let new_expr = operand_expr.min().over(over_as_boxed_slice);
+                    return Ok(new_expr)
+                }
+            }
+        },
         DerivedValuesExpression::Literal(x) => Ok(lit(x)),
         DerivedValuesExpression::Variable(y) => Ok(col(&y.property))
     };
@@ -217,6 +249,8 @@ pub struct GroupAndReducePipeConfig {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 enum AggType {
     Sum,
+    Max,
+    Min,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -476,6 +510,12 @@ impl LazyFrameFactory {
                         match c.r#type {
                             AggType::Sum => {
                                 col(&c.agg_property).sum().alias(&c.name)
+                            },
+                            AggType::Max => {
+                                col(&c.agg_property).max().alias(&c.name)
+                            },
+                            AggType::Min => {
+                                col(&c.agg_property).min().alias(&c.name)
                             },
                         }
                     }).collect::<Vec<_>>()

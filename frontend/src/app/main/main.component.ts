@@ -140,6 +140,19 @@ export class MainComponent implements OnInit {
                         operands: [{ property: 'semester' }, 910]
                     }
                 ]
+            },
+            overPipe: {
+                type: 'DerivedValues',
+                pipeId: 'hoorayFiltered',
+                calcs: [{
+                    name: 'maxAdjustedScoreOver',
+                    expression: {
+                        operation: 'Max',
+                        operand: { property: 'adjustedScore' },
+                        over: ['semester'] /// NEXT: Figure out why it errors when 2+ over arguments
+                        // over: ['semester', 'name'] /// NEXT: Figure out why it errors when 2+ over arguments
+                    }
+                }]
             }
         }
         const inputData: {[k: string]: DataTable} = {
@@ -154,7 +167,7 @@ export class MainComponent implements OnInit {
             studentScores: toDataTypeArrays(this.studentScores, { name: 'str', subject: 'str', score: 'f64' }),
             subjectMultipliers: toDataTypeArrays(this.subjectMultipliers, { subject: 'str', semester: 'i64', multiplier: 'f64' }),
         }
-        const result = runDataPipeline(['hoorayFiltered'], inputData, pipeConfigs)
+        const result = runDataPipeline(['overPipe'], inputData, pipeConfigs)
         // const result = polarsPipes.run_data_pipeline(['adjustedScoresDerivedValues'], inputData, pipeConfigs)
         // const result = polarsPipes.run_data_pipeline(['adjustedScores'], inputData, pipeConfigs)
         console.log('RESULT IS', fromDataTypeArrays(result))

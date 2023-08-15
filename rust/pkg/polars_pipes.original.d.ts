@@ -32,8 +32,15 @@ export interface DerivedValuesExpressionRoot {
 }
 
 export type DerivedValuesExpression = DerivedValuesOperation
+    | DerivedValuesWindowAggExpression
     | DerivedValuesProperty
     | number
+
+export interface DerivedValuesWindowAggExpression {
+    operation: AggType,
+    operand: DerivedValuesExpression,
+    over: string[],
+}
 
 export interface DerivedValuesProperty {
     property: string
@@ -73,6 +80,8 @@ export interface AggConfig {
 }
 
 export type AggType = 'Sum'
+    | 'Max'
+    | 'Min'
 
 export interface FilterPipeConfig {
     type: 'Filter',
