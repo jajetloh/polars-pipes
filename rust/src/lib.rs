@@ -1,6 +1,6 @@
 use wasm_bindgen::prelude::*;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use polars::{prelude::{LazyFrame, col, lit, JoinBuilder, JoinType, DataType, DataFrame, Series, NamedFrom, IntoLazy, min_horizontal, max_horizontal, TimeUnit}, lazy::dsl::{Expr, when}};
 
 use serde::{Deserialize, Serialize};
@@ -631,5 +631,53 @@ fn get_source_pipes_for_single(config: &PipeConfig) -> Vec<String> {
         PipeConfig::Filter(c) => vec![c.pipe_id.clone()],
         PipeConfig::Join(c) => vec![c.left_pipe_id.clone(), c.right_pipe_id.clone()],
         PipeConfig::Rename(c) => vec![c.pipe_id.clone()],
+    }
+}
+
+#[wasm_bindgen]
+pub fn getRootSources(configs: JsValue, endpoint: String) -> Result<JsValue, String> {
+    let pipe_configs: HashMap<String, PipeConfig> = match serde_wasm_bindgen::from_value(configs) {
+        Ok(c) => c,
+        Err(e) => { log(&format!("Error parsing pipe_configs: {:?}", e)); return Err(e.to_string()) }
+    };
+    let result = match serde_wasm_bindgen::to_value(&get_root_sources_for_endpoint(pipe_configs, endpoint)) {
+        Ok(x) => x,
+        Err(e) => { log(&format!("Error converting result to JsValue: {:?}", e)); return Err(e.to_string()) }
+    };
+    Ok(result)
+}
+
+fn get_root_sources_for_endpoint(pipe_configs: HashMap<String, PipeConfig>, endpoint: String) -> Result<Vec<String>, String> {
+    let mut already_traversed = HashSet::new();
+    match get_root_sources_recursive(&endpoint, &pipe_configs, &mut already_traversed) {
+        Ok(x) => {
+            let mut y = x.clone();
+            y.sort();
+            y.dedup();
+            Ok(y)
+        },
+        Err(e) => Err(e),
+    }
+}
+
+fn get_root_sources_recursive(pipe_id: &String, pipe_configs: &HashMap<String, PipeConfig>, already_traversed: &mut HashSet<String>) -> Result<Vec<String>, String> {
+    if already_traversed.contains(pipe_id) {
+        return Ok(vec![])
+    } else {
+        already_traversed.insert(pipe_id.clone());
+    }
+    let config: PipeConfig = match pipe_configs.get(pipe_id) {
+        Some(x) => x.clone(),
+        None => { log(&format!("No pipe config found with id {:?}", pipe_id)); return Err(format!("No pipe config found with id {:?}", pipe_id)) }
+    };
+    let c = get_source_pipes_for_single(&config);
+    match c.len() {
+        0 => {
+            return Ok(vec![pipe_id.clone()])
+        },
+        _ => {
+            let result: Vec<_> = c.iter().map(|inner_pipe_id| get_root_sources_recursive(inner_pipe_id, pipe_configs, already_traversed)).into_iter().flatten().collect();
+            return Ok(result.into_iter().flatten().collect())
+        }
     }
 }

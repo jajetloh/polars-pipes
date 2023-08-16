@@ -1,5 +1,7 @@
 export function getSourcePipes(configs: PipeConfig[]): string[][]
 
+export function getRootSource(configs: Map<string, PipeConfig>, endpoint: string): string[]
+
 export function runDataPipeline(pipe_ids: string[], input_data: {[k: string]: DataTable}, configs: {[k: string]: PipeConfig}): DataTable
 
 export interface DataTable {
