@@ -1,3 +1,7 @@
+export function getSourcePipes(configs: PipeConfig[]): string[][]
+
+export function runDataPipeline(pipe_ids: string[], input_data: {[k: string]: DataTable}, configs: {[k: string]: PipeConfig}): DataTable
+
 export interface DataTable {
     f64: Map<string, (number | null)[]>,
     i64: Map<string, (number | null)[]>,
@@ -12,8 +16,6 @@ export type PipeConfig = SourcePipeConfig
     | FilterPipeConfig
     | JoinPipeConfig
     | RenamePipeConfig
-
-export function runDataPipeline(pipe_ids: string[], input_data: {[k: string]: DataTable}, configs: {[k: string]: PipeConfig}): DataTable
 
 export interface SourcePipeConfig {
     type: 'Source',

@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core'
-import { DataTable, PipeConfig, runDataPipeline } from 'polars-pipes'
+import { DataTable, getSourcePipes, PipeConfig, runDataPipeline } from 'polars-pipes'
 
 function toDataTypeArrays(inputData: any[], columnSchema: {[k: string]: keyof DataTable}): DataTable {
     // TODO: Handle case when some records are missing keys...
@@ -171,5 +171,7 @@ export class MainComponent implements OnInit {
         // const result = polarsPipes.run_data_pipeline(['adjustedScoresDerivedValues'], inputData, pipeConfigs)
         // const result = polarsPipes.run_data_pipeline(['adjustedScores'], inputData, pipeConfigs)
         console.log('RESULT IS', fromDataTypeArrays(result))
+        const sourcePipes = getSourcePipes(Object.values(pipeConfigs))
+        console.log(sourcePipes)
     }
 }

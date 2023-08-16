@@ -606,3 +606,30 @@ impl LazyFrameFactory {
         }
     }
 }
+
+#[wasm_bindgen]
+pub fn getSourcePipes(configs: JsValue) -> Result<JsValue, String> {
+    panic::set_hook(Box::new(console_error_panic_hook::hook));
+
+    let pipe_configs: Vec<PipeConfig> = match serde_wasm_bindgen::from_value(configs) {
+        Ok(c) => c,
+        Err(e) => { log(&format!("Error parsing pipe_configs: {:?}", e)); return Err(e.to_string()) }
+    };
+    let result = pipe_configs.iter().map(get_source_pipes_for_single).collect::<Vec<_>>();
+    let result_jsvalue = match serde_wasm_bindgen::to_value(&result) {
+        Ok(x) => x,
+        Err(e) => { log(&format!("Error converting result to JsValue: {:?}", e)); return Err(e.to_string()) }
+    };
+    Ok(result_jsvalue)
+}
+
+fn get_source_pipes_for_single(config: &PipeConfig) -> Vec<String> {
+    match config {
+        PipeConfig::Source(c) => vec![],
+        PipeConfig::DerivedValues(c) => vec![c.pipe_id.clone()],
+        PipeConfig::GroupAndReduce(c) => vec![c.pipe_id.clone()],
+        PipeConfig::Filter(c) => vec![c.pipe_id.clone()],
+        PipeConfig::Join(c) => vec![c.left_pipe_id.clone(), c.right_pipe_id.clone()],
+        PipeConfig::Rename(c) => vec![c.pipe_id.clone()],
+    }
+}
