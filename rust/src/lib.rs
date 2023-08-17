@@ -635,16 +635,16 @@ fn get_source_pipes_for_single(config: &PipeConfig) -> Vec<String> {
 }
 
 #[wasm_bindgen]
-pub fn getRootSources(configs: JsValue, endpoint: String) -> Result<JsValue, String> {
+pub fn getRootSources(configs: JsValue, endpoint: String) -> JsValue {
     let pipe_configs: HashMap<String, PipeConfig> = match serde_wasm_bindgen::from_value(configs) {
         Ok(c) => c,
-        Err(e) => { log(&format!("Error parsing pipe_configs: {:?}", e)); return Err(e.to_string()) }
+        Err(e) => { panic!("Error parsing pipe_configs: {:?}", e) },
     };
     let result = match serde_wasm_bindgen::to_value(&get_root_sources_for_endpoint(pipe_configs, endpoint)) {
         Ok(x) => x,
-        Err(e) => { log(&format!("Error converting result to JsValue: {:?}", e)); return Err(e.to_string()) }
+        Err(e) => { panic!("Error converting result to JsValue: {:?}", e) }
     };
-    Ok(result)
+    result
 }
 
 fn get_root_sources_for_endpoint(pipe_configs: HashMap<String, PipeConfig>, endpoint: String) -> Result<Vec<String>, String> {

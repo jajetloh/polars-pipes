@@ -1,0 +1,16 @@
+{
+  "name": "polars-pipes",
+  "version": "0.1.0",
+  "files": [
+    "polars_pipes_bg.wasm",
+    "polars_pipes.js",
+    "polars_pipes_bg.js",
+    "polars_pipes.d.ts"
+  ],
+  "module": "polars_pipes.js",
+  "types": "polars_pipes.d.ts",
+  "sideEffects": [
+    "./polars_pipes.js",
+    "./snippets/*"
+  ]
+}
