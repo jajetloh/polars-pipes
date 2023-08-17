@@ -640,7 +640,7 @@ pub fn getRootSources(configs: JsValue, endpoint: String) -> JsValue {
         Ok(c) => c,
         Err(e) => { panic!("Error parsing pipe_configs: {:?}", e) },
     };
-    let result = match serde_wasm_bindgen::to_value(&get_root_sources_for_endpoint(pipe_configs, endpoint)) {
+    let result = match serde_wasm_bindgen::to_value(&get_root_sources_for_endpoint(pipe_configs, endpoint).unwrap()) {
         Ok(x) => x,
         Err(e) => { panic!("Error converting result to JsValue: {:?}", e) }
     };
