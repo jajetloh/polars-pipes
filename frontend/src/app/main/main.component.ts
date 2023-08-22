@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core'
 import { DataTable, getSourcePipes, PipeConfig, runDataPipeline } from 'polars-pipes'
 
-function toDataTypeArrays(inputData: any[], columnSchema: {[k: string]: keyof DataTable}): DataTable {
+export function toDataTypeArrays(inputData: any[], columnSchema: {[k: string]: keyof DataTable}): DataTable {
     // TODO: Handle case when some records are missing keys...
     const initialMap: DataTable = { f64: new Map(), i64: new Map(), str: new Map(), datetime: new Map(), bool: new Map() }
     Object.entries(columnSchema).forEach(([k,v]) => {
@@ -14,7 +14,7 @@ function toDataTypeArrays(inputData: any[], columnSchema: {[k: string]: keyof Da
         return acc
     }, initialMap)
 }
-function fromDataTypeArrays(input: DataTable): any[] {
+export function fromDataTypeArrays(input: DataTable): any[] {
     const columnIters: { name: string, iterRef: any[] }[] = []
     let maxRows = 0
     Object.entries(input)

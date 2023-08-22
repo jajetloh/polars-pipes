@@ -108,7 +108,7 @@ fn recurse_derived_expression(expression: DerivedValuesExpression) -> Result<Exp
                     return Ok(sub_expr)
                 },
                 DerivedValuesOperationType::Multiply => {
-                    let sum_expr = pl_exprs_vec.iter().fold(lit(0), |acc: Expr, x: &Expr| {
+                    let sum_expr = pl_exprs_vec.iter().fold(lit(1), |acc: Expr, x: &Expr| {
                         acc * x.clone()
                     });
                     return Ok(sum_expr)
@@ -419,6 +419,12 @@ pub fn runDataPipeline(pipe_ids: JsValue, input_data: JsValue, configs: JsValue)
         Ok(x) => x,
         Err(e) => { log(&format!("Error parsing input_data: {:?}", e)); return Err(e.into()) }
     };
+    let result = run_data_pipeline(pipes, inputs, pipe_configs);
+    Ok(serde_wasm_bindgen::to_value(&result).unwrap())
+}
+
+
+fn run_data_pipeline(pipe_ids: Vec<String>, inputs: HashMap<String, DataTable>, pipe_configs: HashMap<String, PipeConfig>) -> DataTable {
     let mut lazy_inputs: HashMap<String, LazyFrame> = HashMap::new();
     for (key, value) in inputs.iter() {
         lazy_inputs.insert(key.to_string(), data_table_to_frame(value));
@@ -429,7 +435,7 @@ pub fn runDataPipeline(pipe_ids: JsValue, input_data: JsValue, configs: JsValue)
         pipe_configs,
         lazy_frames: lazy_inputs,
     };
-    Ok(serde_wasm_bindgen::to_value(&lff.create_lazy_frame(pipes.iter().next().unwrap()).unwrap()).unwrap())
+    lff.create_lazy_frame(pipe_ids.iter().next().unwrap()).unwrap()
 }
 
 impl LazyFrameFactory {
